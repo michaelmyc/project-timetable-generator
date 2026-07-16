@@ -1,12 +1,10 @@
 """Multi-project evaluation test cases."""
 
-from dataclasses import dataclass
 from datetime import date
 
+from tests.test_generator.cases import EvalCase
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
-
-from tests.test_generator.cases import EvalCase
 
 
 def _staff(span: GlobalSpan, ids: list[str]) -> list[StaffState]:

@@ -4,10 +4,10 @@ from collections import defaultdict
 
 import pytest
 
+from tests.test_generator.cases_multi import MULTI_TEST_CASES
 from timetable_generator.generator.evaluation import CaseResult, generate_eval_report
 from timetable_generator.generator.judge import judge
 from timetable_generator.generator.retry import generate_with_retry
-from tests.test_generator.cases_multi import MULTI_TEST_CASES
 
 
 @pytest.mark.parametrize("case", MULTI_TEST_CASES, ids=[c.id for c in MULTI_TEST_CASES])

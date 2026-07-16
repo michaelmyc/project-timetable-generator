@@ -2,12 +2,11 @@
 
 import pytest
 
+from tests.test_generator.cases import CORE_TEST_CASES
 from timetable_generator.generator.evaluation import CaseResult, generate_eval_report
 from timetable_generator.generator.judge import JudgeScore, judge
 from timetable_generator.generator.retry import generate_with_retry
-from timetable_generator.generator.validator import validate
 from timetable_generator.models.work_hour import WorkHourRecord
-from tests.test_generator.cases import CORE_TEST_CASES
 
 
 def test_judge_function_basic():

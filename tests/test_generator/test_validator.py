@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from timetable_generator.generator.validator import validate, ValidationResult, Violation
+from timetable_generator.generator.validator import validate
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
 from timetable_generator.models.work_hour import WorkHourRecord

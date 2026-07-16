@@ -1,7 +1,5 @@
 """Tests for HolidayCache."""
 
-import json
-from datetime import date
 
 from timetable_generator.holiday.cache import HolidayCache
 
