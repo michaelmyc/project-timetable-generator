@@ -30,7 +30,8 @@
 
 | 文档 | 说明 | 状态 |
 |---|---|---|
-| [roadmap.md](plans/roadmap.md) | 里程碑路线图 | draft |
+| [roadmap.md](plans/roadmap.md) | 里程碑路线图（M1-M5） | active |
+| [implementation-status.md](plans/implementation-status.md) | 实现状态矩阵（领域概念×里程碑） | active |
 | [epics/](plans/epics/README.md) | 按主题拆分的实现计划 | draft |
 
 ### decisions/ — 架构决策记录（ADR）
@@ -52,6 +53,18 @@
 | [0013](decisions/0013-runtime-model-and-tech-stack.md) | 运行时模型与技术栈确认 | accepted | 2026-07-17 |
 | [0014](decisions/0014-holiday-api-fallback.md) | 节假日 API 降级策略 | accepted | 2026-07-17 |
 | [archive/](decisions/archive/README.md) | 已被推翻的旧 ADR 归档 | — |
+
+### domain/ — 领域知识（世界是什么样的）
+
+| 文档 | 领域 | 说明 |
+|---|---|---|
+| [README.md](domain/README.md) | 索引 | 领域边界与编写约定 |
+| [glossary.md](domain/glossary.md) | 术语 | 所有领域术语统一定义 |
+| [work-hours.md](domain/work-hours.md) | 工时 | 满载/8h/1h拆分/节假日/年假 |
+| [project.md](domain/project.md) | 项目 | 生命周期/投入比例/工种需求/关联员工 |
+| [staff.md](domain/staff.md) | 人事 | 工种/业务线/在职区间/人事变更/默认值 |
+| [ratio.md](domain/ratio.md) | 投入比例 | 分母/分子/周期/离散化/容差 |
+| [compliance.md](domain/compliance.md) | 合规 | 硬约束/软目标/审计语义/生成器定位 |
 
 ### assets/ — 文档配图
 
