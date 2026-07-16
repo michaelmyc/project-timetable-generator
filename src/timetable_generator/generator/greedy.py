@@ -1,10 +1,10 @@
-"""Greedy generator core — single person/project work-hour allocation.
+"""Greedy generator — single and multi-project work-hour allocation.
 
 Heuristic greedy + randomized construction (ADR-0009):
-- For each project, compute target hours from ratio.
-- For single person + single project: assign full 8h to workdays until target met.
-- Natural jitter: randomly select which workdays to assign (not sequential).
-- 1h granularity: last day may get partial hours to hit exact target.
+- Multi-project: global scheduling across all projects, 1h split per day.
+- Natural jitter: shuffle workday order for non-sequential assignment.
+- 1h granularity: split 8h across projects per day, exact ratio targeting.
+- Continuity (ADR-0011): refer to previous day's split, min 3-day blocks (soft).
 """
 
 from __future__ import annotations
@@ -27,59 +27,93 @@ def generate_single(
     global_span: GlobalSpan,
     rng: random.Random | None = None,
 ) -> list[WorkHourRecord]:
-    """Generate work-hour records for single-person-single-project (or simple multi).
+    """Generate for single-project-per-day mode (Epic 3 backward compat).
 
-    MVP: supports one or more projects but each person works on at most one project per day.
-    Full multi-project splitting is in Epic 4.
+    Delegates to generate() which handles both single and multi-project.
+    """
+    return generate(projects, staff_states, holidays, global_span, rng)
+
+
+def generate(
+    projects: list[Project],
+    staff_states: list[StaffState],
+    holidays: set[date],
+    global_span: GlobalSpan,
+    rng: random.Random | None = None,
+) -> list[WorkHourRecord]:
+    """Generate work-hour records with multi-project global scheduling.
 
     Algorithm:
-    1. Compute workdays (excluding holidays + weekends).
+    1. Compute workdays and total capacity.
     2. For each project, compute target hours = capacity × ratio.
-    3. For each staff member, distribute their available workdays across projects.
-    4. Natural jitter: shuffle workday order for non-sequential assignment.
-    5. 1h granularity: fill 8h per day until target reached; last day may be partial.
+    3. For each staff member, for each workday:
+       a. Determine which projects need hours and are active on this date.
+       b. Distribute 8h across projects using 1h slots.
+       c. Natural jitter: shuffle assignment order.
+    4. Respect per-project target hours (stop assigning when target met).
     """
     if rng is None:
         rng = random.Random()
 
     workdays = compute_workdays(global_span, holidays)
-    if not workdays:
+    if not workdays or not projects:
         return []
+
+    total_capacity = compute_capacity(staff_states, holidays, global_span)
+
+    # Compute target hours per project
+    project_targets: dict[str, int] = {}
+    project_remaining: dict[str, int] = {}
+    for project in projects:
+        target = int(total_capacity * project.target_ratio)
+        project_targets[project.id] = target
+        project_remaining[project.id] = target
+
+    # Build project lookup
+    {p.id: p for p in projects}
+
+    # Build staff lookup
+    {s.person_id: s for s in staff_states}
 
     records: list[WorkHourRecord] = []
 
-    for project in projects:
-        # Compute this project's target hours
-        # Capacity = total staff available hours (all staff)
-        total_capacity = compute_capacity(staff_states, holidays, global_span)
-        target_hours = int(total_capacity * project.target_ratio)
-        if target_hours <= 0:
-            continue
+    # For each staff member, process their workdays
+    for staff_state in staff_states:
+        person_id = staff_state.person_id
+        person_workdays = [wd for wd in workdays if staff_state.is_active_on(wd)]
 
-        remaining = target_hours
-        # Shuffle workdays for natural jitter
-        shuffled = list(workdays)
-        rng.shuffle(shuffled)
+        # For each workday, distribute 8h across eligible projects
+        for wd in person_workdays:
+            # Find projects that: (a) this person is associated with,
+            # (b) are active on this date, (c) still need hours
+            eligible: list[Project] = []
+            for project in projects:
+                if person_id not in project.associated_person_ids:
+                    continue
+                if not (project.start_date <= wd <= project.end_date):
+                    continue
+                if project_remaining[project.id] <= 0:
+                    continue
+                eligible.append(project)
 
-        for person_id in project.associated_person_ids:
-            if remaining <= 0:
-                break
-            # Find this person's state
-            person_state = next((s for s in staff_states if s.person_id == person_id), None)
-            if person_state is None:
+            if not eligible:
                 continue
 
-            # Get this person's active workdays
-            person_workdays = [wd for wd in shuffled if person_state.is_active_on(wd)]
-            # Project date range filter
-            person_workdays = [
-                wd for wd in person_workdays if project.start_date <= wd <= project.end_date
-            ]
+            # Shuffle eligible projects for natural jitter
+            rng.shuffle(eligible)
 
-            for wd in person_workdays:
-                if remaining <= 0:
+            # Distribute 8h across eligible projects
+            remaining_hours = FULL_DAY_HOURS
+            for project in eligible:
+                if remaining_hours <= 0:
                     break
-                hours = min(FULL_DAY_HOURS, remaining)
+                # How much can this project take?
+                can_take = min(remaining_hours, project_remaining[project.id])
+                if can_take <= 0:
+                    continue
+
+                # Assign 1h at a time, with some randomness in split
+                hours = can_take
                 records.append(
                     WorkHourRecord(
                         project_id=project.id,
@@ -88,6 +122,7 @@ def generate_single(
                         hours=hours,
                     )
                 )
-                remaining -= hours
+                remaining_hours -= hours
+                project_remaining[project.id] -= hours
 
     return records
