@@ -1,0 +1,46 @@
+[project]
+name = "nicegui-demo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Michael Mao", email = "michael.mao99@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "nicegui>=3.14.0",
+    "pywebview>=6.2.1",
+]
+
+[project.scripts]
+# Console script: runs the same `main.py` logic as the packaged binary.
+nicegui-demo = "nicegui_demo.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.11.21,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pillow>=12.3.0",
+    "pyinstaller>=6.21.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.22",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# Default main file used by the `user` fixture when no marker overrides it.
+# The plugin is registered in tests/conftest.py (pytest_plugins is only
+# valid there, not as an ini option).
+main_file = "main.py"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+# Keep a sensible default set; extend as the project grows.
+extend-select = ["I", "UP", "B", "SIM"]
