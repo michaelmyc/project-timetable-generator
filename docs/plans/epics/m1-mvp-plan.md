@@ -395,12 +395,87 @@ def test_retry_exhausted_raises():
 
 **Green**: 实现 `generate_with_retry` 编排（贪心 → 校验 → 重试，N 次失败报错）。
 
+#### 3.7 算法评估：Test Cases + Judge Function + Report
+
+**目标**：对 generator core 做量化评估，验证算法效果可度量、可对比、可追踪。
+
+**Red**: 写评估测试 `tests/test_generator/test_evaluation.py`
+
+**Test Case 集合**（覆盖典型场景）：
+```python
+TEST_CASES = [
+    # (id, 描述, 规模, 比例, 期望特征)
+    ("tc_single_full", "单人全比例", 1人×10天, ratio=1.0, 每天满载8h),
+    ("tc_single_half", "单人半比例", 1人×20天, ratio=0.5, 约半数天分配),
+    ("tc_single_small", "小规模高精度", 1人×5天, ratio=0.3, 比例误差≤1h步长),
+    ("tc_single_sparse", "低比例稀疏", 1人×30天, ratio=0.1, 分配天数少且分散),
+    ("tc_single_jitter", "自然抖动", 1人×40天, ratio=0.6, 非机械连续),
+]
+```
+
+**Judge Function**（多维度打分）：
+```python
+@dataclass
+class JudgeScore:
+    ratio_accuracy: float      # 比例达成度：1 - |实际比例 - 目标比例| / 目标比例
+    hard_constraint_pass: bool # 硬约束全通过（=8h、节假日、工种覆盖）
+    full_load_ratio: float     # 满载率：=8h的天数 / 分配天数（应为1.0）
+    jitter_naturalness: float  # 抖动自然度：分配天分布的随机性评分（0=机械，1=自然）
+    retry_count: int           # 重试次数（越少越好）
+    overall_score: float       # 加权综合分
+
+def judge(records, test_case, generation_result) -> JudgeScore:
+    ...
+```
+
+**Evaluation Report**（自动生成）：
+```python
+def test_evaluation_report_generated(tmp_path):
+    cases = run_all_test_cases(generator=generate)
+    report = generate_eval_report(cases, output_path=tmp_path / "eval_report.md")
+    assert report.path.exists()
+    # 报告含：每个 test case 的 JudgeScore、硬约束通过率、平均比例误差、重试统计
+    content = report.path.read_text()
+    assert "ratio_accuracy" in content
+    assert "hard_constraint_pass" in content
+    assert "overall_score" in content
+```
+
+Report 格式（Markdown）：
+```markdown
+## Generator Core 评估报告
+
+### 汇总
+- 硬约束通过率：5/5 (100%)
+- 平均比例误差：0.83%
+- 平均重试次数：1.2
+- 平均综合分：0.91
+
+### 各 Test Case 详情
+| Case | 规模 | 比例达成 | 满载率 | 自然度 | 重试 | 综合分 |
+|---|---|---|---|---|---|---|
+| tc_single_full | 1×10 | 100% | 1.0 | N/A | 1 | 1.00 |
+| tc_single_half | 1×20 | 99.2% | 1.0 | 0.85 | 2 | 0.93 |
+| ...
+
+### 结论
+- 硬约束：全通过 ✅
+- 比例精度：1h 粒度下误差 ≤ 1h ✅
+- 自然度：[评估]
+- 是否可进入下一步：[是/否]
+```
+
+**Green**: 实现 `src/timetable_generator/generator/evaluation.py`（judge function + report 生成）。
+
+**Refactor**: 提取 test case 定义到 `tests/test_generator/cases.py`，judge 逻辑到 `src/timetable_generator/generator/judge.py`。
+
 ### Epic 3 验收
 
 ```bash
 uv run pytest tests/test_generator/ -v
+uv run python -m timetable_generator.generator.evaluation --report  # 生成评估报告
 ```
-全绿 → 合入 `integration/m1-gen-holiday`（Epic 1+2+3 集成测试）。
+全绿 + 评估报告硬约束通过率 100% + 比例误差 ≤ 1h → 合入 `integration/m1-gen-holiday`。
 
 ---
 
@@ -490,12 +565,97 @@ def test_capacity_conflict_reports_person_and_projects():
 
 **Green**: 实现冲突检测与诊断报错。
 
+#### 4.5 算法评估：多项目 Test Cases + Judge Function + Report
+
+**目标**：对 generator multi 做量化评估，在 Epic 3 评估基础上增加多项目特有维度。
+
+**Red**: 写评估测试 `tests/test_generator/test_evaluation_multi.py`
+
+**多项目 Test Case 集合**（在 Epic 3 单人用例基础上扩展）：
+```python
+MULTI_TEST_CASES = [
+    # (id, 描述, 规模, 项目数, 比例组合, 期望特征)
+    ("tc_multi_2p_half", "2项目各50%", 1人×20天, 2项目, [0.5,0.5], 跨日=8h, 1h拆分),
+    ("tc_multi_3p_split", "3项目拆分", 1人×30天, 3项目, [0.5,0.3,0.2], 每天拆分),
+    ("tc_multi_2p_2person", "2项目2人", 2人×20天, 2项目, [0.4,0.3], 跨人跨项目),
+    ("tc_multi_conflict", "容量冲突", 1人×10天, 2项目, [0.7,0.7], 应报错),
+    ("tc_multi_continuity", "持续性验证", 1人×60天, 2项目, [0.6,0.4], 连续块≥3天),
+    ("tc_multi_jitter_ref", "拆分渐变", 1人×30天, 2项目, [0.5,0.5], 相邻天差≤2h),
+    ("tc_multi_precision", "小规模精度", 1人×5天, 2项目, [0.3,0.5], 1h精确凑配),
+]
+```
+
+**多项目 Judge Function**（扩展 Epic 3 的 JudgeScore）：
+```python
+@dataclass
+class MultiJudgeScore(JudgeScore):
+    cross_project_eq_8h: bool       # 每人每天跨项目求和 = 8h（硬约束）
+    split_1h_granularity: bool      # 所有分配为 1h 整数倍（硬约束）
+    avg_block_length: float         # 平均连续块长度（软目标，应 ≥3）
+    split_jitter_stability: float   # 拆分渐变稳定性：相邻天同项目小时差 ≤2h 的比例
+    job_type_coverage: bool         # 每项目工种覆盖（硬约束）
+
+def judge_multi(records, test_case, generation_result) -> MultiJudgeScore:
+    ...
+```
+
+**Evaluation Report**（扩展，含多项目维度）：
+```python
+def test_multi_eval_report(tmp_path):
+    cases = run_all_multi_cases(generator=generate)
+    report = generate_eval_report(cases, output_path=tmp_path / "eval_multi.md")
+    content = report.path.read_text()
+    # 多项目特有维度
+    assert "cross_project_eq_8h" in content
+    assert "avg_block_length" in content
+    assert "split_jitter_stability" in content
+```
+
+Report 格式（Markdown，扩展 Epic 3 格式）：
+```markdown
+## Generator Multi 评估报告
+
+### 汇总
+- 硬约束通过率：7/7 (100%)
+  - 跨项目 =8h：100%
+  - 1h 粒度：100%
+  - 工种覆盖：100%
+- 平均比例误差：0.92%
+- 平均连续块长度：4.3 天（目标 ≥3）
+- 拆分渐变稳定性：87%（相邻天差 ≤2h）
+- 平均重试次数：2.1
+- 平均综合分：0.88
+
+### 各 Test Case 详情
+| Case | 规模 | 跨日=8h | 1h粒度 | 连续块 | 渐变稳定 | 比例达成 | 重试 | 综合分 |
+|---|---|---|---|---|---|---|---|---|
+| tc_multi_2p_half | 1×20 | ✅ | ✅ | 5.2 | 95% | 99.5% | 1 | 0.95 |
+| tc_multi_continuity | 1×60 | ✅ | ✅ | 4.3 | 82% | 98.7% | 3 | 0.86 |
+| ...
+
+### 冲突场景
+| Case | 预期 | 实际 | 结论 |
+|---|---|---|---|
+| tc_multi_conflict | 报错+诊断 | 报错含u1/p1/p2 | ✅ |
+
+### 结论
+- 硬约束：全通过 ✅
+- 持续性软目标：平均块 4.3 ≥ 3 ✅
+- 拆分渐变：87% ≤ 阈值 [评估]
+- 是否可进入下一步：[是/否]
+```
+
+**Green**: 扩展 `src/timetable_generator/generator/evaluation.py`（多项目 judge + report）。
+
+**Refactor**: 统一单人/多项目评估为同一框架，test case 用标签区分。
+
 ### Epic 4 验收
 
 ```bash
 uv run pytest tests/test_generator/ -v
+uv run python -m timetable_generator.generator.evaluation --report --multi  # 生成多项目评估报告
 ```
-全绿 → 合入 `integration/m1-gen-multi`。
+全绿 + 评估报告硬约束通过率 100% + 跨项目 =8h 全通过 + 平均连续块 ≥3 + 比例误差 ≤ 1h → 合入 `integration/m1-gen-multi`。
 
 ---
 
