@@ -1,15 +1,23 @@
-"""Runnable entry point and PyInstaller/Nuitka target.
+"""Entry point for PyInstaller and nicegui testing."""
 
-`nicegui-pack --onefile --name nicegui-demo main.py` bundles this file.
-It delegates to `nicegui_demo.__main__:main` so the console script and the
-packaged binary share a single implementation.
+import multiprocessing
 
-Run directly with:  uv run python main.py
-"""
+from nicegui import ui
 
-from __future__ import annotations
+from timetable_generator.ui.app import build_ui
 
-from nicegui_demo.__main__ import main
+
+@ui.page("/")
+def index() -> None:
+    """Main page — builds the timetable generator UI."""
+    build_ui()
+
+
+def main() -> None:
+    """Run the timetable generator UI."""
+    ui.run(title="排班打卡时间表生成器", reload=False, port=8080)
+
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()
