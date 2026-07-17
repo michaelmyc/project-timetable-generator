@@ -121,9 +121,12 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
         existing = session.staff[edit_index] if edit_index is not None else None
 
         name_input = ui.input(label="员工姓名", value=existing.name if existing else "")
-        job_input = ui.input(
-            label="工种（textbox，可输入新工种）",
+        job_input = ui.select(
+            label="工种",
+            options=session.job_types,
             value=existing.job_type if existing else DEFAULT_JOB_TYPE,
+            with_input=True,
+            new_value_mode="add",
         )
         # Business line: 暂不考虑
         ui.label("业务线: 【暂不考虑】（导入导出保留）").classes("text-caption text-grey")
@@ -147,7 +150,8 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             if not name:
                 ui.notify("姓名不能为空", type="warning")
                 return
-            job = (job_input.value or "").strip() or DEFAULT_JOB_TYPE
+            job = str(job_input.value or "").strip() or DEFAULT_JOB_TYPE
+            session.add_job_type(job)
             bl = (bl_input.value or "").strip() or None
             onboard = (
                 date.fromisoformat((onboard_input.value or "").strip())
@@ -230,6 +234,7 @@ def _import_staff(session, staff_table) -> None:
                 tmp.write_bytes(content)
                 imported = import_staff_csv(tmp)
                 session.staff.extend(imported)
+                session.add_job_types([s.job_type for s in imported if s.job_type])
                 _refresh_staff_table(session, staff_table)
                 ui.notify(f"导入 {len(imported)} 名员工", type="positive")
                 dialog.close()
@@ -308,16 +313,14 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             start_input.value = existing.start_date.isoformat()
             end_input.value = existing.end_date.isoformat()
 
-        # Job types: computed from staff, textbox multi
-        job_types = session.get_job_types()
-        ui.label(
-            f"可用工种（从员工管理 computed）: {', '.join(job_types) if job_types else '无'}"
-        ).classes("text-caption")
-        jobs_input = ui.input(
-            label="所需工种（逗号分隔，可空=不设约束）",
-            value=", ".join(existing.required_job_types)
-            if existing and existing.required_job_types
-            else "",
+        # Job types: select from session list, multiple, allow new
+        jobs_input = ui.select(
+            label="所需工种（可空=不设约束；可多选或输入新建）",
+            options=session.job_types,
+            value=existing.required_job_types if existing and existing.required_job_types else [],
+            multiple=True,
+            with_input=True,
+            new_value_mode="add",
         )
 
         def _save():
@@ -341,11 +344,11 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
                 if end_input.value
                 else session.global_span.end_date
             )
-            jobs = (
-                [j.strip() for j in (jobs_input.value or "").split(",") if j.strip()]
-                if jobs_input.value
-                else []
-            )
+            selected_jobs = jobs_input.value or []
+            if isinstance(selected_jobs, str):
+                selected_jobs = [selected_jobs]
+            jobs = [str(j).strip() for j in selected_jobs if str(j).strip()]
+            session.add_job_types(jobs)
             staff_ids = session.get_staff_ids()
             if not staff_ids:
                 ui.notify("请先添加员工", type="warning")
@@ -432,6 +435,8 @@ def _import_projects(session) -> None:
                 tmp.write_bytes(content)
                 imported = import_projects_csv(tmp)
                 session.projects.extend(imported)
+                for p in imported:
+                    session.add_job_types(p.required_job_types)
                 _refresh_project_table(session, session._project_table)  # type: ignore[attr-defined]
                 ui.notify(f"导入 {len(imported)} 个项目", type="positive")
                 dialog.close()
