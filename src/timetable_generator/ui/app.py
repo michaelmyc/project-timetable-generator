@@ -14,6 +14,7 @@ Features:
 from __future__ import annotations
 
 import asyncio
+import sys
 import threading
 from datetime import date
 from pathlib import Path
@@ -37,9 +38,8 @@ RATIO_TOLERANCE = 0.08
 
 def _download_file(data: bytes, filename: str) -> None:
     """Download file: native mode uses pywebview save dialog, web mode uses ui.download."""
-    from nicegui import app
 
-    if app.native.is_enabled:
+    if "--native" in sys.argv:
         # Native/webview mode: use pywebview save dialog
         import webview
 
