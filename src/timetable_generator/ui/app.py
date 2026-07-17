@@ -138,20 +138,20 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
         )
 
         def _save():
-            name = name_input.value.strip()
+            name = (name_input.value or "").strip()
             if not name:
                 ui.notify("姓名不能为空", type="warning")
                 return
-            job = job_input.value.strip() or DEFAULT_JOB_TYPE
-            bl = bl_input.value.strip() or None
+            job = (job_input.value or "").strip() or DEFAULT_JOB_TYPE
+            bl = (bl_input.value or "").strip() or None
             onboard = (
-                date.fromisoformat(onboard_input.value.strip())
-                if onboard_input.value and onboard_input.value.strip()
+                date.fromisoformat((onboard_input.value or "").strip())
+                if onboard_input.value and (onboard_input.value or "").strip()
                 else None
             )
             leave = (
-                date.fromisoformat(leave_input.value.strip())
-                if leave_input.value and leave_input.value.strip()
+                date.fromisoformat((leave_input.value or "").strip())
+                if leave_input.value and (leave_input.value or "").strip()
                 else None
             )
             staff = StaffInfo(
@@ -199,7 +199,7 @@ def _import_staff(session, staff_table) -> None:
         ui.label("格式: 员工,工种,业务线,入职时间,离职时间").classes("text-caption")
 
         def _do_import():
-            path = Path(path_input.value.strip())
+            path = Path((path_input.value or "").strip())
             if not path.exists():
                 ui.notify(f"文件不存在: {path}", type="negative")
                 return
@@ -294,13 +294,13 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
         )
 
         def _save():
-            pid = pid_input.value.strip()
-            pname = pname_input.value.strip()
+            pid = (pid_input.value or "").strip()
+            pname = (pname_input.value or "").strip()
             if not pid or not pname:
                 ui.notify("标识和名称不能为空", type="warning")
                 return
             ratio = float(ratio_input.value)
-            bl = bl_input.value.strip() or None
+            bl = (bl_input.value or "").strip() or None
             if session.global_span is None:
                 ui.notify("请先设定全局区间", type="warning")
                 return
@@ -315,7 +315,7 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
                 else session.global_span.end_date
             )
             jobs = (
-                [j.strip() for j in jobs_input.value.split(",") if j.strip()]
+                [j.strip() for j in (jobs_input.value or "").split(",") if j.strip()]
                 if jobs_input.value
                 else []
             )
@@ -373,7 +373,7 @@ def _import_projects(session) -> None:
             ui.notify("请先设定全局区间", type="warning")
 
         def _do_import():
-            path = Path(path_input.value.strip())
+            path = Path((path_input.value or "").strip())
             if not path.exists():
                 ui.notify(f"文件不存在: {path}", type="negative")
                 return
