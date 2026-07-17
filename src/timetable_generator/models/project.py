@@ -40,8 +40,7 @@ class Project:
             raise ValueError("Project id must not be empty")
         if not (0.0 <= self.target_ratio <= 1.0):
             raise ValueError(f"target_ratio must be in [0, 1], got {self.target_ratio}")
-        if not self.required_job_types:
-            raise ValueError("required_job_types must not be empty")
+        # required_job_types may be empty — means no job type constraint
         if not self.associated_person_ids:
             raise ValueError("associated_person_ids must not be empty")
         if self.end_date < self.start_date:

@@ -60,9 +60,11 @@ def validate(
                 )
             )
 
-    # Check job type coverage
+    # Check job type coverage (skip if project has no required job types)
     staff_by_id = {s.person_id: s for s in staff_states}
     for project in projects:
+        if not project.required_job_types:
+            continue  # No job type constraint → skip coverage check
         # Find all persons with records on this project
         persons_on_project = {r.person_id for r in records if r.project_id == project.id}
         # Check each required job type has at least 1 person

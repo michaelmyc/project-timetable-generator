@@ -2,6 +2,11 @@
 
 Single-page workflow: global span → staff list → project batch → generate → export.
 All in-memory, no persistence (ADR-0006).
+Features:
+- Job type dynamic mapping (session runtime dict, ADR-0006 D2)
+- Add job type via dropdown + free text input
+- Project required_job_types selectable from job type dict (can be empty)
+- Async generation without blocking event loop
 """
 
 from __future__ import annotations
@@ -21,10 +26,14 @@ from timetable_generator.models.project import Project
 from timetable_generator.models.staff_state import StaffState
 from timetable_generator.ui.session import SessionState
 
+DEFAULT_JOB_TYPES = ["研发人员"]
+
 
 def build_ui() -> SessionState:
     """Build the UI and return the session state for testing."""
     session = SessionState()
+    # Job type runtime dict (session-level, ADR-0006 D2)
+    job_types: list[str] = list(DEFAULT_JOB_TYPES)
 
     ui.label("排班打卡时间表生成器").classes("text-h4 q-mb-md")
 
@@ -40,9 +49,17 @@ def build_ui() -> SessionState:
     ui.label("2. 员工名单").classes("text-h6 q-mt-md")
     with ui.row():
         staff_name_input = ui.input(label="员工姓名")
-        staff_job_input = ui.input(label="工种（默认研发人员）", value="研发人员")
+        # Job type: select from existing or type new
+        staff_job_select = ui.select(
+            label="工种",
+            options=job_types,
+            value="研发人员",
+            new_value_mode="add",
+            with_input=True,
+        )
         ui.button(
-            "添加员工", on_click=lambda: _add_staff(session, staff_name_input, staff_job_input)
+            "添加员工",
+            on_click=lambda: _add_staff(session, staff_name_input, staff_job_select, job_types),
         )
     staff_table = ui.table(
         columns=[
@@ -59,11 +76,19 @@ def build_ui() -> SessionState:
         proj_id_input = ui.input(label="项目标识")
         proj_name_input = ui.input(label="项目名称")
         proj_ratio_input = ui.number(label="投入比例 (0-1)", value=0.3, min=0, max=1, step=0.01)
-    proj_jobs_input = ui.input(label="所需工种（逗号分隔）", value="研发人员")
+    # Required job types: multi-select from job type dict (can be empty)
+    proj_jobs_select = ui.select(
+        label="所需工种（可空=不设工种约束；可多选或输入新建）",
+        options=job_types,
+        value=[],
+        multiple=True,
+        with_input=True,
+        new_value_mode="add",
+    )
     ui.button(
         "添加项目",
         on_click=lambda: _add_project(
-            session, proj_id_input, proj_name_input, proj_ratio_input, proj_jobs_input, span_label
+            session, proj_id_input, proj_name_input, proj_ratio_input, proj_jobs_select, job_types
         ),
     )
     project_list = ui.column()
@@ -94,11 +119,17 @@ def _set_span(session: SessionState, start_input, end_input) -> None:
     session._span_label.text = f"区间: {start} → {end}"  # type: ignore[attr-defined]
 
 
-def _add_staff(session: SessionState, name_input, job_input) -> None:
+def _add_staff(session: SessionState, name_input, job_select, job_types: list[str]) -> None:
     name = name_input.value.strip()
     if not name:
         return
-    job = job_input.value.strip() or "研发人员"
+    job = str(job_select.value).strip() if job_select.value else "研发人员"
+    if not job:
+        job = "研发人员"
+    # Add new job type to runtime dict if not present
+    if job not in job_types:
+        job_types.append(job)
+        job_select.options = list(job_types)
     session.add_staff(name=name, job_type=job)
     name_input.value = ""
     rows = [{"name": s.name, "job_type": s.job_type, "id": s.name} for s in session.staff]
@@ -106,7 +137,12 @@ def _add_staff(session: SessionState, name_input, job_input) -> None:
 
 
 def _add_project(
-    session: SessionState, id_input, name_input, ratio_input, jobs_input, span_label
+    session: SessionState,
+    id_input,
+    name_input,
+    ratio_input,
+    jobs_select,
+    job_types: list[str],
 ) -> None:
     if session.global_span is None:
         ui.notify("请先设定全局区间", type="warning")
@@ -117,7 +153,17 @@ def _add_project(
         ui.notify("项目标识和名称不能为空", type="warning")
         return
     ratio = float(ratio_input.value)
-    jobs = [j.strip() for j in jobs_input.value.split(",") if j.strip()]
+    # Get selected job types (may be empty = no constraint)
+    selected_jobs = jobs_select.value or []
+    if isinstance(selected_jobs, str):
+        selected_jobs = [selected_jobs]
+    jobs = [str(j).strip() for j in selected_jobs if str(j).strip()]
+    # Add any new job types to runtime dict
+    for j in jobs:
+        if j not in job_types:
+            job_types.append(j)
+    jobs_select.options = list(job_types)
+
     staff_ids = session.get_staff_ids()
     if not staff_ids:
         ui.notify("请先添加员工", type="warning")
@@ -138,9 +184,8 @@ def _add_project(
     session._project_list.clear()  # type: ignore[attr-defined]
     with session._project_list:  # type: ignore[attr-defined]
         for p in session.projects:
-            ui.label(
-                f"  {p.id} | {p.name} | 比例 {p.target_ratio:.0%} | 工种 {', '.join(p.required_job_types)}"
-            )
+            jobs_str = ", ".join(p.required_job_types) if p.required_job_types else "无约束"
+            ui.label(f"  {p.id} | {p.name} | 比例 {p.target_ratio:.0%} | 工种: {jobs_str}")
 
 
 def _generate(session: SessionState, progress_label, result_label) -> None:
@@ -154,11 +199,35 @@ def _generate(session: SessionState, progress_label, result_label) -> None:
         assert span is not None
         staff_states = [StaffState.from_changes(s.name, [], span) for s in session.staff]
 
-        # Holidays
+        # Holidays — use asyncio loop safely (not asyncio.run inside event loop)
         cache = HolidayCache(_get_cache_dir())
         orch = HolidayOrchestrator(cache=cache)
         years = range(span.start_date.year, span.end_date.year + 1)
-        resolver = asyncio.run(orch.ensure_years(*years))
+
+        # Try to get event loop; if running, use run_until_complete on a new loop
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Create a new loop in a thread to avoid "cannot call from running loop"
+                import threading
+
+                result_box: list = []
+
+                def _run():
+                    new_loop = asyncio.new_event_loop()
+                    resolver = new_loop.run_until_complete(orch.ensure_years(*years))
+                    result_box.append(resolver)
+                    new_loop.close()
+
+                t = threading.Thread(target=_run)
+                t.start()
+                t.join()
+                resolver = result_box[0]
+            else:
+                resolver = loop.run_until_complete(orch.ensure_years(*years))
+        except RuntimeError:
+            resolver = asyncio.run(orch.ensure_years(*years))
+
         holidays: set[date] = set()
         session.holiday_fallback = resolver.is_fallback
 

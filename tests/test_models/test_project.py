@@ -40,12 +40,13 @@ def test_project_invalid_ratio_negative_raises():
         )
 
 
-def test_project_empty_job_types_raises():
-    with pytest.raises(ValueError, match="required_job_types"):
-        Project(
-            id="p1", name="A", start_date=date(2026, 1, 1), end_date=date(2026, 3, 31),
-            target_ratio=0.3, required_job_types=[], associated_person_ids=["u1"],
-        )
+def test_project_empty_job_types_allowed():
+    """required_job_types may be empty — means no job type constraint."""
+    p = Project(
+        id="p1", name="A", start_date=date(2026, 1, 1), end_date=date(2026, 3, 31),
+        target_ratio=0.3, required_job_types=[], associated_person_ids=["u1"],
+    )
+    assert p.required_job_types == []
 
 
 def test_project_end_before_start_raises():
