@@ -95,10 +95,9 @@ def _build_staff_management(session: SessionState) -> None:
     staff_table = ui.table(
         columns=[
             {"name": "name", "label": "员工", "field": "name"},
-            {"name": "job_type", "label": "工种", "field": "job_type"},
-            {"name": "business_line", "label": "业务线", "field": "business_line"},
-            {"name": "onboard_date", "label": "入职时间", "field": "onboard_date"},
-            {"name": "leave_date", "label": "离职时间", "field": "leave_date"},
+            {"name": "business_line", "label": "业务线【暂不考虑】", "field": "business_line"},
+            {"name": "onboard_date", "label": "入职时间【暂不考虑】", "field": "onboard_date"},
+            {"name": "leave_date", "label": "离职时间【暂不考虑】", "field": "leave_date"},
         ],
         rows=[],
         row_key="name",
@@ -184,10 +183,9 @@ def _refresh_staff_table(session, staff_table) -> None:
             {
                 "name": s.name,
                 "job_type": s.job_type,
-                "business_line": s.business_line or "",
-                "onboard_date": s.onboard_date.isoformat() if s.onboard_date else "",
-                "leave_date": s.leave_date.isoformat() if s.leave_date else "",
-                "id": s.name,
+                "business_line": s.business_line or "—",
+                "onboard_date": s.onboard_date.isoformat() if s.onboard_date else "—",
+                "leave_date": s.leave_date.isoformat() if s.leave_date else "—",
             }
         )
     staff_table.update_rows(rows)
@@ -241,8 +239,7 @@ def _build_project_management(session: SessionState) -> None:
         columns=[
             {"name": "id", "label": "项目标识", "field": "id"},
             {"name": "name", "label": "项目名称", "field": "name"},
-            {"name": "business_line", "label": "业务线", "field": "business_line"},
-            {"name": "target_ratio", "label": "投入百分比", "field": "target_ratio"},
+            {"name": "business_line", "label": "业务线【暂不考虑】", "field": "business_line"},
             {"name": "start_date", "label": "开始时间", "field": "start_date"},
             {"name": "end_date", "label": "结束时间", "field": "end_date"},
         ],
@@ -352,7 +349,7 @@ def _refresh_project_table(session, project_table) -> None:
             {
                 "id": p.id,
                 "name": p.name,
-                "business_line": p.business_line or "",
+                "business_line": p.business_line or "—",
                 "target_ratio": f"{p.target_ratio:.0%}",
                 "start_date": p.start_date.isoformat(),
                 "end_date": p.end_date.isoformat(),
