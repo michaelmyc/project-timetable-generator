@@ -18,20 +18,17 @@ def _write(path: Path, text: str) -> Path:
     return path
 
 
-DEFAULT_START = date(2026, 1, 1)
-DEFAULT_END = date(2026, 3, 31)
-
-
-def test_import_projects_csv_six_columns(tmp_path: Path):
+def test_import_projects_csv_five_columns(tmp_path: Path):
     csv_text = (
-        "项目标识,项目名称,业务线,投入百分比,项目开始时间,项目结束时间\n"
-        "p1,项目A,平台,0.3,2026-01-15,2026-02-15\n"
-        "p2,项目B,,0.5,2026-03-01,2026-04-01\n"
+        "项目名称,业务线,投入百分比,项目开始时间,项目结束时间\n"
+        "项目A,平台,0.3,2026-01-15,2026-02-15\n"
+        "项目B,,0.5,2026-03-01,2026-04-01\n"
     )
     path = _write(tmp_path / "projects.csv", csv_text)
     projects = import_projects_csv(path)
     assert len(projects) == 2
-    assert projects[0].id == "p1"
+    # id = name (合并)
+    assert projects[0].id == "项目A"
     assert projects[0].name == "项目A"
     assert projects[0].business_line == "平台"
     assert projects[0].target_ratio == 0.3
@@ -47,7 +44,7 @@ def test_import_projects_csv_six_columns(tmp_path: Path):
 
 
 def test_import_projects_csv_missing_columns_raises(tmp_path: Path):
-    csv_text = "项目标识,项目名称\np1,A\n"
+    csv_text = "项目名称\nA\n"
     path = _write(tmp_path / "bad.csv", csv_text)
     with pytest.raises(ValueError, match="missing required columns"):
         import_projects_csv(path)
@@ -55,21 +52,21 @@ def test_import_projects_csv_missing_columns_raises(tmp_path: Path):
 
 def test_import_projects_csv_skips_blank_rows(tmp_path: Path):
     csv_text = (
-        "项目标识,项目名称,业务线,投入百分比,项目开始时间,项目结束时间\n"
-        "p1,A,平台,0.3,2026-01-01,2026-03-31\n"
+        "项目名称,业务线,投入百分比,项目开始时间,项目结束时间\n"
+        "A,平台,0.3,2026-01-01,2026-03-31\n"
         "\n"
         "\n"
     )
     path = _write(tmp_path / "blanks.csv", csv_text)
     projects = import_projects_csv(path)
     assert len(projects) == 1
-    assert projects[0].id == "p1"
+    assert projects[0].id == "A"
 
 
 def test_export_projects_csv_header_and_rows(tmp_path: Path):
     projects = [
         Project(
-            id="p1",
+            id="项目A",
             name="项目A",
             start_date=date(2026, 1, 15),
             end_date=date(2026, 2, 15),
@@ -83,15 +80,15 @@ def test_export_projects_csv_header_and_rows(tmp_path: Path):
     export_projects_csv(projects, path)
     text = path.read_text(encoding="utf-8-sig")
     lines = text.strip().splitlines()
-    assert lines[0] == "项目标识,项目名称,业务线,投入百分比,项目开始时间,项目结束时间"
-    assert lines[1] == "p1,项目A,平台,0.3,2026-01-15,2026-02-15"
+    assert lines[0] == "项目名称,业务线,投入百分比,项目开始时间,项目结束时间"
+    assert lines[1] == "项目A,平台,0.3,2026-01-15,2026-02-15"
 
 
 def test_export_import_projects_csv_roundtrip(tmp_path: Path):
-    """export → import round-trips 6 columns (defaults applied to pending ids)."""
+    """export → import round-trips 5 columns (id=name)."""
     original = [
         Project(
-            id="p1",
+            id="项目A",
             name="项目A",
             start_date=date(2026, 1, 15),
             end_date=date(2026, 2, 15),
@@ -101,7 +98,7 @@ def test_export_import_projects_csv_roundtrip(tmp_path: Path):
             business_line="平台",
         ),
         Project(
-            id="p2",
+            id="项目B",
             name="项目B",
             start_date=date(2026, 1, 1),
             end_date=date(2026, 3, 31),
@@ -126,7 +123,7 @@ def test_projects_xlsx_roundtrip(tmp_path: Path):
 
     original = [
         Project(
-            id="p1",
+            id="项目A",
             name="项目A",
             start_date=date(2026, 1, 15),
             end_date=date(2026, 2, 15),

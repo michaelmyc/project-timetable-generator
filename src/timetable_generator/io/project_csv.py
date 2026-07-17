@@ -21,7 +21,6 @@ from pathlib import Path
 from timetable_generator.models.project import Project
 
 REQUIRED_COLUMNS = [
-    "项目标识",
     "项目名称",
     "业务线",
     "投入百分比",
@@ -109,17 +108,17 @@ def import_projects_csv(path: Path) -> list[Project]:
 
     projects: list[Project] = []
     for row in rows:
-        pid = _clean(row.get("项目标识"))
-        if not pid:
+        name = _clean(row.get("项目名称"))
+        if not name:
             continue  # skip blank rows
-        name = _clean(row.get("项目名称")) or pid
+        pid = name  # id = name (合并)
         business_line = _clean(row.get("业务线"))
         ratio_raw = _clean(row.get("投入百分比"))
         target_ratio = float(ratio_raw) if ratio_raw else 0.0
         start_date = _parse_date_cell(row.get("项目开始时间"))
         end_date = _parse_date_cell(row.get("项目结束时间"))
         if not start_date or not end_date:
-            raise ValueError(f"项目 {pid} 缺少开始或结束时间")
+            raise ValueError(f"项目 {name} 缺少开始或结束时间")
         projects.append(
             Project(
                 id=pid,
@@ -141,7 +140,6 @@ def _format_date(d: date | None) -> str:
 
 def _project_row(p: Project) -> list[str]:
     return [
-        p.id,
         p.name,
         p.business_line or "",
         f"{p.target_ratio}",
@@ -175,14 +173,5 @@ def _export_xlsx(projects: list[Project], path: Path) -> None:
     ws.title = "项目"
     ws.append(HEADER_ROW)
     for p in projects:
-        ws.append(
-            [
-                p.id,
-                p.name,
-                p.business_line or "",
-                p.target_ratio,
-                p.start_date,
-                p.end_date,
-            ]
-        )
+        ws.append(_project_row(p))
     wb.save(path)

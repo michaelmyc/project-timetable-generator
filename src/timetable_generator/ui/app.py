@@ -435,7 +435,7 @@ def _import_projects(session) -> None:
     """Import projects via file picker (ui.upload)."""
     with ui.dialog() as dialog, ui.card():
         ui.label("导入项目").classes("text-h6")
-        ui.label("格式: 项目标识,项目名称,业务线,投入百分比,项目开始时间,项目结束时间").classes(
+        ui.label("格式: 项目名称,业务线,投入百分比,项目开始时间,项目结束时间").classes(
             "text-caption"
         )
 
