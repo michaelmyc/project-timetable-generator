@@ -36,7 +36,7 @@ from timetable_generator.ui.session import SessionState
 RATIO_TOLERANCE = 0.08
 
 
-def _download_file(data: bytes, filename: str) -> None:
+async def _download_file(data: bytes, filename: str) -> None:
     """Download file: native mode uses pywebview save dialog, web mode uses ui.download."""
 
     if "--native" in sys.argv:
@@ -46,7 +46,7 @@ def _download_file(data: bytes, filename: str) -> None:
 
         window = nicegui_app.native.main_window
         if window is not None:
-            result = window.create_file_dialog(
+            result = await window.create_file_dialog(
                 webview.SAVE_DIALOG,
                 save_filename=filename,
                 file_types=("CSV files (*.csv)", "JSON files (*.json)", "All files (*.*)"),
@@ -290,7 +290,7 @@ def _import_staff(session, staff_table) -> None:
     dialog.open()
 
 
-def _export_staff(session) -> None:
+async def _export_staff(session) -> None:
     """Export staff to CSV via browser download."""
     if not session.staff:
         ui.notify("没有员工可导出", type="warning")
@@ -299,7 +299,7 @@ def _export_staff(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_staff_csv(session.staff, tmp)
-    _download_file(tmp.read_bytes(), filename="staff_export.csv")
+    await _download_file(tmp.read_bytes(), filename="staff_export.csv")
 
 
 # --- Step 3: Project Management ---
@@ -490,7 +490,7 @@ def _import_projects(session) -> None:
     dialog.open()
 
 
-def _export_projects(session) -> None:
+async def _export_projects(session) -> None:
     """Export projects to CSV via browser download."""
     if not session.projects:
         ui.notify("没有项目可导出", type="warning")
@@ -499,7 +499,7 @@ def _export_projects(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_projects_csv(session.projects, tmp)
-    _download_file(tmp.read_bytes(), filename="projects_export.csv")
+    await _download_file(tmp.read_bytes(), filename="projects_export.csv")
 
 
 # --- Step 4: Validation ---
@@ -646,7 +646,7 @@ def _build_export(session: SessionState) -> None:
     ui.button("导出配置 (JSON)", on_click=lambda: _export_params(session))
 
 
-def _export_csv(session) -> None:
+async def _export_csv(session) -> None:
     """Export work-hour records to CSV via browser download."""
     if not session.has_result:
         ui.notify("请先生成", type="warning")
@@ -655,10 +655,10 @@ def _export_csv(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_csv(session.generation_result.records, tmp)
-    _download_file(tmp.read_bytes(), filename="output.csv")
+    await _download_file(tmp.read_bytes(), filename="output.csv")
 
 
-def _export_params(session) -> None:
+async def _export_params(session) -> None:
     """Export session params to JSON via browser download."""
     if session.global_span is None:
         ui.notify("请先设定区间", type="warning")
@@ -672,7 +672,7 @@ def _export_params(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".json"))
     export_params(params, tmp)
-    _download_file(tmp.read_bytes(), filename="params.json")
+    await _download_file(tmp.read_bytes(), filename="params.json")
 
 
 # --- Algorithm Info ---
