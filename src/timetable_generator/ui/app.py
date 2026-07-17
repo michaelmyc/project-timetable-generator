@@ -60,11 +60,21 @@ def _build_global_span(session: SessionState) -> None:
     def _on_change(_e=None) -> None:
         start_val = start_picker.value
         end_val = end_picker.value
-        if start_val and end_val:
+        if not start_val or not end_val:
+            return
+        try:
             start = date.fromisoformat(str(start_val))
             end = date.fromisoformat(str(end_val))
-            session.set_span(start, end)
-            span_label.text = f"区间: {start} → {end}"
+        except ValueError:
+            ui.notify("日期格式不合法", type="warning")
+            span_label.text = "区间未设定（日期不合法）"
+            return
+        if end < start:
+            ui.notify("结束日期不能早于开始日期", type="warning")
+            span_label.text = "区间未设定（结束早于开始）"
+            return
+        session.set_span(start, end)
+        span_label.text = f"区间: {start} → {end}"
 
     with ui.row():
         start_picker = ui.date_input(label="开始日期", on_change=_on_change)
