@@ -40,11 +40,12 @@ def _download_file(data: bytes, filename: str) -> None:
     """Download file: native mode uses pywebview save dialog, web mode uses ui.download."""
 
     if "--native" in sys.argv:
-        # Native/webview mode: use pywebview save dialog
+        # Native/webview mode: use NiceGUI's main_window save dialog
         import webview
+        from nicegui import app as nicegui_app
 
-        window = webview.active_window()
-        if window:
+        window = nicegui_app.native.main_window
+        if window is not None:
             result = window.create_file_dialog(
                 webview.SAVE_DIALOG,
                 save_filename=filename,
