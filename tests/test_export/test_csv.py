@@ -33,9 +33,7 @@ def test_csv_export_basic(tmp_path: Path):
 def test_csv_date_format(tmp_path: Path):
     """Dates must be YYYY-MM-DD."""
     records = [
-        WorkHourRecord(
-            project_id="p1", person_id="u1", date=date(2026, 12, 31), hours=8
-        ),
+        WorkHourRecord(project_id="p1", person_id="u1", date=date(2026, 12, 31), hours=8),
     ]
     out = tmp_path / "dates.csv"
     export_csv(records, out)

@@ -31,10 +31,17 @@ CORE_TEST_CASES: list[EvalCase] = [
         description="单人全比例",
         global_span=GlobalSpan(date(2026, 3, 2), date(2026, 3, 13)),  # 2 weeks
         staff=_make_staff(GlobalSpan(date(2026, 3, 2), date(2026, 3, 13)), ["u1"]),
-        projects=[Project(
-            id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 13),
-            target_ratio=1.0, required_job_types=["研发人员"], associated_person_ids=["u1"],
-        )],
+        projects=[
+            Project(
+                id="p1",
+                name="A",
+                start_date=date(2026, 3, 2),
+                end_date=date(2026, 3, 13),
+                target_ratio=1.0,
+                required_job_types=["研发人员"],
+                associated_person_ids=["u1"],
+            )
+        ],
         holidays=set(),
         expected_target_hours={"p1": 80},  # 10 workdays × 8h
     ),
@@ -43,10 +50,17 @@ CORE_TEST_CASES: list[EvalCase] = [
         description="单人半比例",
         global_span=GlobalSpan(date(2026, 3, 2), date(2026, 3, 13)),
         staff=_make_staff(GlobalSpan(date(2026, 3, 2), date(2026, 3, 13)), ["u1"]),
-        projects=[Project(
-            id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 13),
-            target_ratio=0.5, required_job_types=["研发人员"], associated_person_ids=["u1"],
-        )],
+        projects=[
+            Project(
+                id="p1",
+                name="A",
+                start_date=date(2026, 3, 2),
+                end_date=date(2026, 3, 13),
+                target_ratio=0.5,
+                required_job_types=["研发人员"],
+                associated_person_ids=["u1"],
+            )
+        ],
         holidays=set(),
         expected_target_hours={"p1": 40},  # 80 × 0.5
     ),
@@ -55,10 +69,17 @@ CORE_TEST_CASES: list[EvalCase] = [
         description="小规模高精度",
         global_span=GlobalSpan(date(2026, 3, 2), date(2026, 3, 6)),  # 5 workdays
         staff=_make_staff(GlobalSpan(date(2026, 3, 2), date(2026, 3, 6)), ["u1"]),
-        projects=[Project(
-            id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 6),
-            target_ratio=0.3, required_job_types=["研发人员"], associated_person_ids=["u1"],
-        )],
+        projects=[
+            Project(
+                id="p1",
+                name="A",
+                start_date=date(2026, 3, 2),
+                end_date=date(2026, 3, 6),
+                target_ratio=0.3,
+                required_job_types=["研发人员"],
+                associated_person_ids=["u1"],
+            )
+        ],
         holidays=set(),
         expected_target_hours={"p1": 12},  # 40 × 0.3
     ),
@@ -67,10 +88,17 @@ CORE_TEST_CASES: list[EvalCase] = [
         description="低比例稀疏",
         global_span=GlobalSpan(date(2026, 3, 2), date(2026, 3, 27)),  # 4 weeks
         staff=_make_staff(GlobalSpan(date(2026, 3, 2), date(2026, 3, 27)), ["u1"]),
-        projects=[Project(
-            id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 27),
-            target_ratio=0.1, required_job_types=["研发人员"], associated_person_ids=["u1"],
-        )],
+        projects=[
+            Project(
+                id="p1",
+                name="A",
+                start_date=date(2026, 3, 2),
+                end_date=date(2026, 3, 27),
+                target_ratio=0.1,
+                required_job_types=["研发人员"],
+                associated_person_ids=["u1"],
+            )
+        ],
         holidays=set(),
         expected_target_hours={"p1": 16},  # 20 workdays × 8 × 0.1 = 16
     ),
@@ -79,10 +107,17 @@ CORE_TEST_CASES: list[EvalCase] = [
         description="自然抖动",
         global_span=GlobalSpan(date(2026, 3, 2), date(2026, 4, 10)),  # ~6 weeks
         staff=_make_staff(GlobalSpan(date(2026, 3, 2), date(2026, 4, 10)), ["u1"]),
-        projects=[Project(
-            id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 4, 10),
-            target_ratio=0.6, required_job_types=["研发人员"], associated_person_ids=["u1"],
-        )],
+        projects=[
+            Project(
+                id="p1",
+                name="A",
+                start_date=date(2026, 3, 2),
+                end_date=date(2026, 4, 10),
+                target_ratio=0.6,
+                required_job_types=["研发人员"],
+                associated_person_ids=["u1"],
+            )
+        ],
         holidays=set(),
         expected_target_hours={"p1": 144},  # 30 workdays × 8 × 0.6 = 144
     ),

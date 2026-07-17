@@ -14,8 +14,11 @@ from timetable_generator.generator.retry import generate_with_retry
 def test_multi_cases_pass_hard_constraints(case):
     """Each multi test case passes hard constraints."""
     result = generate_with_retry(
-        projects=case.projects, staff_states=case.staff,
-        holidays=case.holidays, global_span=case.global_span, max_retries=10,
+        projects=case.projects,
+        staff_states=case.staff,
+        holidays=case.holidays,
+        global_span=case.global_span,
+        max_retries=10,
     )
     assert result.validation.is_valid, f"Case {case.id} failed: {result.validation.violations}"
 
@@ -25,8 +28,11 @@ def test_multi_cases_cross_day_eq_8h(case):
     """When total ratio = 1.0, each person's daily total = 8h.
     When total ratio < 1.0, daily total should be <= 8h (not necessarily 8h)."""
     result = generate_with_retry(
-        projects=case.projects, staff_states=case.staff,
-        holidays=case.holidays, global_span=case.global_span, max_retries=10,
+        projects=case.projects,
+        staff_states=case.staff,
+        holidays=case.holidays,
+        global_span=case.global_span,
+        max_retries=10,
     )
     total_ratio = sum(p.target_ratio for p in case.projects)
     by_day: dict[tuple, int] = defaultdict(int)
@@ -42,8 +48,11 @@ def test_multi_cases_cross_day_eq_8h(case):
 def test_multi_cases_ratio_within_tolerance(case):
     """Each project achieves target hours within 1h tolerance."""
     result = generate_with_retry(
-        projects=case.projects, staff_states=case.staff,
-        holidays=case.holidays, global_span=case.global_span, max_retries=10,
+        projects=case.projects,
+        staff_states=case.staff,
+        holidays=case.holidays,
+        global_span=case.global_span,
+        max_retries=10,
     )
     for pid, expected in case.expected_target_hours.items():
         actual = sum(r.hours for r in result.records if r.project_id == pid)
@@ -57,8 +66,11 @@ def test_multi_evaluation_report(tmp_path):
     results: list[CaseResult] = []
     for case in MULTI_TEST_CASES:
         result = generate_with_retry(
-            projects=case.projects, staff_states=case.staff,
-            holidays=case.holidays, global_span=case.global_span, max_retries=10,
+            projects=case.projects,
+            staff_states=case.staff,
+            holidays=case.holidays,
+            global_span=case.global_span,
+            max_retries=10,
         )
         for pid, target_h in case.expected_target_hours.items():
             actual_h = sum(r.hours for r in result.records if r.project_id == pid)
@@ -71,13 +83,19 @@ def test_multi_evaluation_report(tmp_path):
                 actual_ratio=actual_ratio,
                 retry_count=result.attempts,
             )
-            results.append(CaseResult(
-                case_id=case.id, description=case.description,
-                score=score, actual_hours=actual_h, target_hours=target_h,
-            ))
+            results.append(
+                CaseResult(
+                    case_id=case.id,
+                    description=case.description,
+                    score=score,
+                    actual_hours=actual_h,
+                    target_hours=target_h,
+                )
+            )
 
     report_path = generate_eval_report(
-        results, tmp_path / "eval_multi.md",
+        results,
+        tmp_path / "eval_multi.md",
         title="Generator Multi 评估报告",
     )
     content = report_path.read_text(encoding="utf-8")

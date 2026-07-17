@@ -11,10 +11,8 @@ def test_continuous_block_min_3_days_statistical():
     """Average block length should be >= 2.5 (soft target: 3)."""
     span = GlobalSpan(date(2026, 3, 2), date(2026, 4, 10))  # ~6 weeks
     staff = [StaffState.from_changes("u1", [], span)]
-    p1 = Project("p1", "A", date(2026, 3, 2), date(2026, 4, 10),
-                 0.6, ["研发人员"], ["u1"])
-    p2 = Project("p2", "B", date(2026, 3, 2), date(2026, 4, 10),
-                 0.4, ["研发人员"], ["u1"])
+    p1 = Project("p1", "A", date(2026, 3, 2), date(2026, 4, 10), 0.6, ["研发人员"], ["u1"])
+    p2 = Project("p2", "B", date(2026, 3, 2), date(2026, 4, 10), 0.4, ["研发人员"], ["u1"])
     records = generate([p1, p2], staff, holidays=set(), global_span=span)
 
     # Compute continuous blocks for p1
@@ -40,14 +38,13 @@ def test_split_jitter_stability():
     """Adjacent days' same-project hours should not differ by more than 2h."""
     span = GlobalSpan(date(2026, 3, 2), date(2026, 3, 27))  # 4 weeks
     staff = [StaffState.from_changes("u1", [], span)]
-    p1 = Project("p1", "A", date(2026, 3, 2), date(2026, 3, 27),
-                 0.5, ["研发人员"], ["u1"])
-    p2 = Project("p2", "B", date(2026, 3, 2), date(2026, 3, 27),
-                 0.5, ["研发人员"], ["u1"])
+    p1 = Project("p1", "A", date(2026, 3, 2), date(2026, 3, 27), 0.5, ["研发人员"], ["u1"])
+    p2 = Project("p2", "B", date(2026, 3, 2), date(2026, 3, 27), 0.5, ["研发人员"], ["u1"])
     records = generate([p1, p2], staff, holidays=set(), global_span=span)
 
     # Group by date, get p1 hours per day
     from collections import defaultdict
+
     p1_by_day: dict[date, int] = defaultdict(int)
     for r in records:
         if r.project_id == "p1":

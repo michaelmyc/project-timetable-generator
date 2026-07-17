@@ -36,6 +36,7 @@ async def test_api_success_caches_result(tmp_path, httpx_mock):
     assert cached is not None
     assert "2026-01-01" in cached
 
+
 @pytest.mark.asyncio
 async def test_api_fail_fallback_weekend(tmp_path, httpx_mock):
     httpx_mock.add_response(

@@ -1,6 +1,5 @@
 """Tests for HolidayCache."""
 
-
 from timetable_generator.holiday.cache import HolidayCache
 
 

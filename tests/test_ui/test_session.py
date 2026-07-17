@@ -2,8 +2,8 @@
 
 from datetime import date
 
-from timetable_generator.models.staff_info import StaffInfo
 from timetable_generator.models.project import Project
+from timetable_generator.models.staff_info import StaffInfo
 from timetable_generator.ui.session import SessionState
 
 
@@ -50,8 +50,7 @@ def test_remove_staff():
 def test_add_project():
     s = SessionState()
     s.set_span(date(2026, 1, 1), date(2026, 6, 30))
-    p = Project("p1", "A", date(2026, 1, 1), date(2026, 6, 30),
-                0.3, ["研发人员"], ["张三"])
+    p = Project("p1", "A", date(2026, 1, 1), date(2026, 6, 30), 0.3, ["研发人员"], ["张三"])
     s.add_project(p)
     assert len(s.projects) == 1
 
@@ -63,8 +62,9 @@ def test_can_generate():
     assert not s.can_generate
     s.add_staff(StaffInfo(name="张三"))
     assert not s.can_generate
-    s.add_project(Project("p1", "A", date(2026, 1, 1), date(2026, 6, 30),
-                          0.3, ["研发人员"], ["张三"]))
+    s.add_project(
+        Project("p1", "A", date(2026, 1, 1), date(2026, 6, 30), 0.3, ["研发人员"], ["张三"])
+    )
     assert s.can_generate
 
 

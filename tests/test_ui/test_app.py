@@ -2,8 +2,6 @@
 
 from nicegui.testing import user_simulation
 
-from timetable_generator.ui.app import build_ui
-
 
 async def test_page_loads(user: user_simulation):
     await user.open("/")

@@ -12,8 +12,13 @@ def test_validate_all_pass():
     span = GlobalSpan(date(2026, 3, 2), date(2026, 3, 6))
     staff = [StaffState.from_changes("u1", [], span)]
     project = Project(
-        id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 6),
-        target_ratio=1.0, required_job_types=["研发人员"], associated_person_ids=["u1"],
+        id="p1",
+        name="A",
+        start_date=date(2026, 3, 2),
+        end_date=date(2026, 3, 6),
+        target_ratio=1.0,
+        required_job_types=["研发人员"],
+        associated_person_ids=["u1"],
     )
     records = [
         WorkHourRecord("p1", "u1", date(2026, 3, 2), 8),
@@ -31,8 +36,13 @@ def test_validate_hours_exceed_8():
     span = GlobalSpan(date(2026, 3, 2), date(2026, 3, 6))
     staff = [StaffState.from_changes("u1", [], span)]
     project = Project(
-        id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 6),
-        target_ratio=1.0, required_job_types=["研发人员"], associated_person_ids=["u1"],
+        id="p1",
+        name="A",
+        start_date=date(2026, 3, 2),
+        end_date=date(2026, 3, 6),
+        target_ratio=1.0,
+        required_job_types=["研发人员"],
+        associated_person_ids=["u1"],
     )
     # 9h is invalid but we can't create it via WorkHourRecord (raises ValueError)
     # Instead test that a valid set with all 8h passes the hours check
@@ -47,8 +57,13 @@ def test_validate_holiday_has_hours():
     span = GlobalSpan(date(2026, 1, 1), date(2026, 1, 5))
     staff = [StaffState.from_changes("u1", [], span)]
     project = Project(
-        id="p1", name="A", start_date=date(2026, 1, 1), end_date=date(2026, 1, 5),
-        target_ratio=1.0, required_job_types=["研发人员"], associated_person_ids=["u1"],
+        id="p1",
+        name="A",
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 5),
+        target_ratio=1.0,
+        required_job_types=["研发人员"],
+        associated_person_ids=["u1"],
     )
     records = [WorkHourRecord("p1", "u1", date(2026, 1, 1), 8)]  # Jan 1 is holiday
     result = validate(records, [project], staff, holidays={date(2026, 1, 1)}, global_span=span)
@@ -60,8 +75,13 @@ def test_validate_job_type_coverage():
     span = GlobalSpan(date(2026, 3, 2), date(2026, 3, 6))
     staff = [StaffState.from_changes("u1", [], span)]  # u1 is 研发人员
     project = Project(
-        id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 6),
-        target_ratio=1.0, required_job_types=["研发人员", "测试"], associated_person_ids=["u1"],
+        id="p1",
+        name="A",
+        start_date=date(2026, 3, 2),
+        end_date=date(2026, 3, 6),
+        target_ratio=1.0,
+        required_job_types=["研发人员", "测试"],
+        associated_person_ids=["u1"],
     )
     records = [WorkHourRecord("p1", "u1", date(2026, 3, 2), 8)]
     result = validate(records, [project], staff, holidays=set(), global_span=span)
@@ -74,8 +94,13 @@ def test_validate_ratio_achievement():
     span = GlobalSpan(date(2026, 3, 2), date(2026, 3, 6))
     staff = [StaffState.from_changes("u1", [], span)]
     project = Project(
-        id="p1", name="A", start_date=date(2026, 3, 2), end_date=date(2026, 3, 6),
-        target_ratio=0.5, required_job_types=["研发人员"], associated_person_ids=["u1"],
+        id="p1",
+        name="A",
+        start_date=date(2026, 3, 2),
+        end_date=date(2026, 3, 6),
+        target_ratio=0.5,
+        required_job_types=["研发人员"],
+        associated_person_ids=["u1"],
     )
     # capacity = 5 × 8 = 40h, target = 20h
     records = [

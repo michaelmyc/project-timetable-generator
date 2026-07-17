@@ -11,10 +11,14 @@ from timetable_generator.models.work_hour import WorkHourRecord
 
 def test_judge_function_basic():
     """Judge function produces all expected fields."""
-    records = [WorkHourRecord("p1", "u1", d, 8) for d in
-               [__import__("datetime").date(2026, 3, 2),
-                __import__("datetime").date(2026, 3, 4),
-                __import__("datetime").date(2026, 3, 6)]]
+    records = [
+        WorkHourRecord("p1", "u1", d, 8)
+        for d in [
+            __import__("datetime").date(2026, 3, 2),
+            __import__("datetime").date(2026, 3, 4),
+            __import__("datetime").date(2026, 3, 6),
+        ]
+    ]
     score = judge(
         records=records,
         validation=type("V", (), {"is_valid": True})(),
@@ -48,11 +52,15 @@ def test_evaluation_report_generated(tmp_path):
             case_id="tc_test",
             description="测试用例",
             score=JudgeScore(
-                ratio_accuracy=0.98, hard_constraint_pass=True,
-                full_load_ratio=1.0, jitter_naturalness=0.75,
-                retry_count=2, overall_score=0.88,
+                ratio_accuracy=0.98,
+                hard_constraint_pass=True,
+                full_load_ratio=1.0,
+                jitter_naturalness=0.75,
+                retry_count=2,
+                overall_score=0.88,
             ),
-            actual_hours=40, target_hours=40,
+            actual_hours=40,
+            target_hours=40,
         ),
     ]
     report_path = generate_eval_report(results, tmp_path / "eval_report.md")
@@ -117,16 +125,19 @@ def test_full_evaluation_report(tmp_path):
                 actual_ratio=actual_ratio,
                 retry_count=result.attempts,
             )
-            results.append(CaseResult(
-                case_id=case.id,
-                description=case.description,
-                score=score,
-                actual_hours=actual_h,
-                target_hours=target_h,
-            ))
+            results.append(
+                CaseResult(
+                    case_id=case.id,
+                    description=case.description,
+                    score=score,
+                    actual_hours=actual_h,
+                    target_hours=target_h,
+                )
+            )
 
-    report_path = generate_eval_report(results, tmp_path / "eval_core.md",
-                                       title="Generator Core 评估报告")
+    report_path = generate_eval_report(
+        results, tmp_path / "eval_core.md", title="Generator Core 评估报告"
+    )
     content = report_path.read_text(encoding="utf-8")
     # All hard constraints should pass
     assert "全通过 ✅" in content

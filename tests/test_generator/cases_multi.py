@@ -43,8 +43,12 @@ MULTI_TEST_CASES: list[EvalCase] = [
         global_span=GlobalSpan(date(2026, 3, 2), date(2026, 3, 13)),
         staff=_staff(GlobalSpan(date(2026, 3, 2), date(2026, 3, 13)), ["u1", "u2"]),
         projects=[
-            Project("p1", "A", date(2026, 3, 2), date(2026, 3, 13), 0.4, ["研发人员"], ["u1", "u2"]),
-            Project("p2", "B", date(2026, 3, 2), date(2026, 3, 13), 0.3, ["研发人员"], ["u1", "u2"]),
+            Project(
+                "p1", "A", date(2026, 3, 2), date(2026, 3, 13), 0.4, ["研发人员"], ["u1", "u2"]
+            ),
+            Project(
+                "p2", "B", date(2026, 3, 2), date(2026, 3, 13), 0.3, ["研发人员"], ["u1", "u2"]
+            ),
         ],
         holidays=set(),
         expected_target_hours={"p1": 64, "p2": 48},  # capacity=160, 0.4*160=64, 0.3*160=48
