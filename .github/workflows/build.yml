@@ -16,10 +16,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS — arm64 only (Apple Silicon); x86_64 via Rosetta
+          # macOS — arm64 (Apple Silicon) and x86_64 (Intel)
           - os: macos
             arch: arm64
             runner: macos-14
+          - os: macos
+            arch: x86_64
+            runner: macos-13
           # Windows — x86_64
           - os: windows
             arch: x86_64
@@ -57,8 +60,6 @@ jobs:
       - name: Build binary
         shell: bash
         run: |
-          # macOS: onedir + --windowed → .app bundle
-          # Windows/Linux: onefile + --windowed → single executable
           bash scripts/build.sh --native
 
       - name: Package artifact (macOS)
