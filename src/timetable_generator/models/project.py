@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 
@@ -13,8 +13,8 @@ class Project:
     Attributes:
         id: Unique project identifier.
         name: Human-readable project name.
-        start_date: Project start date (inclusive).
-        end_date: Project end date (inclusive).
+        start_date: Project start date (inclusive). May be None — resolved at generation time.
+        end_date: Project end date (inclusive). May be None — resolved at generation time.
         target_ratio: Investment target as a ratio of total staff available hours (0.0–1.0).
         required_job_types: Set of job-type strings the project needs covered.
         associated_person_ids: Subset of staff IDs assigned to this project.
@@ -26,11 +26,11 @@ class Project:
 
     id: str
     name: str
-    start_date: date
-    end_date: date
-    target_ratio: float
-    required_job_types: list[str]
-    associated_person_ids: list[str]
+    start_date: date | None = None
+    end_date: date | None = None
+    target_ratio: float = 0.0
+    required_job_types: list[str] = field(default_factory=list)
+    associated_person_ids: list[str] = field(default_factory=list)
     ramp_up_point: date | None = None
     maintenance_point: date | None = None
     business_line: str | None = None
@@ -45,16 +45,26 @@ class Project:
             raise ValueError(f"target_ratio must be in [0, 1], got {self.target_ratio}")
         # required_job_types may be empty — means no job type constraint
         # associated_person_ids may be empty — means all staff (resolved at generation time)
-        if self.end_date < self.start_date:
+        if (
+            self.start_date is not None
+            and self.end_date is not None
+            and self.end_date < self.start_date
+        ):
             raise ValueError(
                 f"end_date ({self.end_date}) must not be before start_date ({self.start_date})"
             )
-        if self.ramp_up_point is not None and not (
-            self.start_date <= self.ramp_up_point <= self.end_date
+        if (
+            self.ramp_up_point is not None
+            and self.start_date is not None
+            and self.end_date is not None
+            and not (self.start_date <= self.ramp_up_point <= self.end_date)
         ):
             raise ValueError("ramp_up_point must be within [start_date, end_date]")
-        if self.maintenance_point is not None and not (
-            self.start_date <= self.maintenance_point <= self.end_date
+        if (
+            self.maintenance_point is not None
+            and self.start_date is not None
+            and self.end_date is not None
+            and not (self.start_date <= self.maintenance_point <= self.end_date)
         ):
             raise ValueError("maintenance_point must be within [start_date, end_date]")
         if (

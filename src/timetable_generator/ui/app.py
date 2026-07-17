@@ -358,11 +358,9 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             bl = str(bl_input.value or "").strip() or None
             if bl:
                 session.add_business_line(bl)
-            # Dates: use date_input values; if empty, use placeholder (resolved at generation time)
-            sd_str = str(start_input.value).strip() if start_input.value else ""
-            ed_str = str(end_input.value).strip() if end_input.value else ""
-            sd = date.fromisoformat(sd_str) if sd_str else date(2000, 1, 1)
-            ed = date.fromisoformat(ed_str) if ed_str else date(2099, 12, 31)
+            # Dates: use date_input values; if empty, None (resolved at generation time)
+            sd = date.fromisoformat(str(start_input.value)) if start_input.value else None
+            ed = date.fromisoformat(str(end_input.value)) if end_input.value else None
             selected_jobs = jobs_input.value or []
             if isinstance(selected_jobs, str):
                 selected_jobs = [selected_jobs]
@@ -426,8 +424,8 @@ def _refresh_project_table(session, project_table) -> None:
                 if p.required_job_types
                 else "无约束",
                 "business_line": p.business_line or "—",
-                "start_date": p.start_date.isoformat(),
-                "end_date": p.end_date.isoformat(),
+                "start_date": p.start_date.isoformat() if p.start_date else "—",
+                "end_date": p.end_date.isoformat() if p.end_date else "—",
             }
         )
     project_table.update_rows(rows)
@@ -536,15 +534,13 @@ def _generate(session, progress_label, result_label) -> None:
         assert span is not None
         staff_states = [StaffState.from_changes(s.name, [], span) for s in session.staff]
 
-        # Resolve: empty associated_person_ids → all staff; placeholder dates → global span
+        # Resolve: empty associated_person_ids → all staff; None dates → global span
         all_staff_ids = [s.name for s in session.staff]
-        PLACEHOLDER_START = date(2000, 1, 1)
-        PLACEHOLDER_END = date(2099, 12, 31)
         projects_to_gen = []
         for p in session.projects:
-            # Replace placeholder dates with global span
-            sd = p.start_date if p.start_date != PLACEHOLDER_START else span.start_date
-            ed = p.end_date if p.end_date != PLACEHOLDER_END else span.end_date
+            # Replace None dates with global span
+            sd = p.start_date if p.start_date is not None else span.start_date
+            ed = p.end_date if p.end_date is not None else span.end_date
             # Replace empty associated_person_ids with all staff
             pids = p.associated_person_ids if p.associated_person_ids else all_staff_ids
             projects_to_gen.append(
