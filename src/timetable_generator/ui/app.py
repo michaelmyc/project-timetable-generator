@@ -268,7 +268,7 @@ def _export_staff(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_staff_csv(session.staff, tmp)
-    ui.download(tmp, filename="staff_export.csv")
+    ui.download(tmp.read_bytes(), filename="staff_export.csv")
 
 
 # --- Step 3: Project Management ---
@@ -468,7 +468,7 @@ def _export_projects(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_projects_csv(session.projects, tmp)
-    ui.download(tmp, filename="projects_export.csv")
+    ui.download(tmp.read_bytes(), filename="projects_export.csv")
 
 
 # --- Step 4: Validation ---
@@ -624,7 +624,7 @@ def _export_csv(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_csv(session.generation_result.records, tmp)
-    ui.download(tmp, filename="output.csv")
+    ui.download(tmp.read_bytes(), filename="output.csv")
 
 
 def _export_params(session) -> None:
@@ -641,7 +641,7 @@ def _export_params(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".json"))
     export_params(params, tmp)
-    ui.download(tmp, filename="params.json")
+    ui.download(tmp.read_bytes(), filename="params.json")
 
 
 # --- Algorithm Info ---
