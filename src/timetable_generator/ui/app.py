@@ -242,9 +242,8 @@ def _import_staff(session, staff_table) -> None:
 
         async def _on_upload(e):
             try:
-                content = e.content.read()
                 tmp = Path("/tmp/_staff_import.tmp")
-                tmp.write_bytes(content)
+                await e.file.save(tmp)
                 imported = import_staff_csv(tmp)
                 session.staff.extend(imported)
                 session.add_job_types([s.job_type for s in imported if s.job_type])
@@ -441,9 +440,8 @@ def _import_projects(session) -> None:
 
         async def _on_upload(e):
             try:
-                content = e.content.read()
                 tmp = Path("/tmp/_project_import.tmp")
-                tmp.write_bytes(content)
+                await e.file.save(tmp)
                 imported = import_projects_csv(tmp)
                 session.projects.extend(imported)
                 for p in imported:
