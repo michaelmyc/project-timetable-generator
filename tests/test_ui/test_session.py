@@ -75,12 +75,16 @@ def test_get_staff_ids():
     assert s.get_staff_ids() == ["张三", "李四"]
 
 
-def test_get_job_types_computed():
+def test_job_types_session_level():
+    """job_types is a session-level list, not computed from staff."""
     s = SessionState()
+    assert s.job_types == ["研发人员"]
+    s.add_job_type("测试")
+    assert "测试" in s.job_types
     s.add_staff(StaffInfo(name="张三", job_type="研发人员"))
     s.add_staff(StaffInfo(name="李四", job_type="测试"))
-    types = s.get_job_types()
-    assert set(types) == {"研发人员", "测试"}
+    # get_job_types returns session list (includes default + added)
+    assert set(s.get_job_types()) >= {"研发人员", "测试"}
 
 
 def test_clear_result():
