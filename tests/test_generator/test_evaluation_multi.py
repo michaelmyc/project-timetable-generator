@@ -22,16 +22,20 @@ def test_multi_cases_pass_hard_constraints(case):
 
 @pytest.mark.parametrize("case", MULTI_TEST_CASES, ids=[c.id for c in MULTI_TEST_CASES])
 def test_multi_cases_cross_day_eq_8h(case):
-    """Each person's daily total across projects = 8h."""
+    """When total ratio = 1.0, each person's daily total = 8h.
+    When total ratio < 1.0, daily total should be <= 8h (not necessarily 8h)."""
     result = generate_with_retry(
         projects=case.projects, staff_states=case.staff,
         holidays=case.holidays, global_span=case.global_span, max_retries=10,
     )
+    total_ratio = sum(p.target_ratio for p in case.projects)
     by_day: dict[tuple, int] = defaultdict(int)
     for r in result.records:
         by_day[(r.person_id, r.date)] += r.hours
     for key, total in by_day.items():
-        assert total == 8, f"Case {case.id} {key}: {total}h != 8h"
+        assert total <= 8, f"Case {case.id} {key}: {total}h > 8h"
+        if total_ratio >= 1.0:
+            assert total == 8, f"Case {case.id} {key}: {total}h != 8h (total ratio=1.0)"
 
 
 @pytest.mark.parametrize("case", MULTI_TEST_CASES, ids=[c.id for c in MULTI_TEST_CASES])
