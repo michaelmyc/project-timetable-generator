@@ -55,7 +55,7 @@ def build_ui() -> SessionState:
 # --- Step 1: Global Span (calendar) ---
 def _build_global_span(session: SessionState) -> None:
     ui.label("1. 全局生成区间").classes("text-h6")
-    span_label = ui.label("区间未设定")
+
 
     def _on_change(_e=None) -> None:
         start_val = start_picker.value
@@ -67,19 +67,15 @@ def _build_global_span(session: SessionState) -> None:
             end = date.fromisoformat(str(end_val))
         except ValueError:
             ui.notify("日期格式不合法", type="warning")
-            span_label.text = "区间未设定（日期不合法）"
             return
         if end < start:
             ui.notify("结束日期不能早于开始日期", type="warning")
-            span_label.text = "区间未设定（结束早于开始）"
             return
         session.set_span(start, end)
-        span_label.text = f"区间: {start} → {end}"
 
     with ui.row():
         start_picker = ui.date_input(label="开始日期", on_change=_on_change)
         end_picker = ui.date_input(label="结束日期", on_change=_on_change)
-    session._span_label = span_label  # type: ignore[attr-defined]
 
 
 def _set_span(session, start_picker, end_picker, span_label) -> None:
