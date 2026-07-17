@@ -86,7 +86,9 @@ def build_ui() -> SessionState:
         ui.tab("校验与生成")
         ui.tab("结果导出")
 
-    with ui.tab_panels(tabs, value="区间设置").classes("w-full").style("margin-top: 50px"):
+    # --- Tab panels ---
+    panels = ui.tab_panels(tabs, value="区间设置").classes("w-full").style("margin-top: 50px")
+    with panels:
         with ui.tab_panel("区间设置"):
             _build_global_span(session)
         with ui.tab_panel("员工管理"):
@@ -98,15 +100,36 @@ def build_ui() -> SessionState:
         with ui.tab_panel("结果导出"):
             _build_export(session)
 
-    return session
+    # --- Global fixed bottom action bar (outside tab panels) ---
+    staff_bottom = (
+        ui.row()
+        .classes("sticky-bottom-bar w-full")
+        .bind_visibility_from(panels, "value", backward=lambda v: v == "员工管理")
+    )
+    with staff_bottom:
+        ui.button(
+            "添加员工", on_click=lambda: _show_staff_dialog(session, session._staff_table, None)
+        )  # type: ignore[attr-defined]
+        ui.button(
+            "删除选中", on_click=lambda: _delete_selected_staff(session, session._staff_table)
+        )  # type: ignore[attr-defined]
+
+    project_bottom = (
+        ui.row()
+        .classes("sticky-bottom-bar w-full")
+        .bind_visibility_from(panels, "value", backward=lambda v: v == "项目管理")
+    )
+    with project_bottom:
+        ui.button(
+            "添加项目", on_click=lambda: _show_project_dialog(session, session._project_table, None)
+        )  # type: ignore[attr-defined]
+        ui.button(
+            "删除选中", on_click=lambda: _delete_selected_project(session, session._project_table)
+        )  # type: ignore[attr-defined]
 
 
 # --- Tab 1: Global Span (calendar) ---
 def _build_global_span(session: SessionState) -> None:
-    ui.label("欢迎使用排班打卡时间表生成器").classes("text-h6")
-    ui.label("请在下方设置全局生成区间，然后在其他标签页管理员工、项目并生成工时表。").classes(
-        "text-body1 q-mb-md"
-    )
     ui.label("全局生成区间").classes("text-subtitle1")
 
     def _on_change(_e=None) -> None:
@@ -162,11 +185,6 @@ def _build_staff_management(session: SessionState) -> None:
         """,
     )
     staff_table.on("edit", lambda e: _on_edit_staff(session, staff_table, e.args))
-
-    # Sticky bottom action bar
-    with ui.row().classes("sticky-bottom-bar w-full"):
-        ui.button("添加员工", on_click=lambda: _show_staff_dialog(session, staff_table, None))
-        ui.button("删除选中", on_click=lambda: _delete_selected_staff(session, staff_table))
 
     session._staff_table = staff_table  # type: ignore[attr-defined]
 
@@ -345,11 +363,6 @@ def _build_project_management(session: SessionState) -> None:
     )
     project_table.on("edit", lambda e: _on_edit_project(session, project_table, e.args))
 
-    # Sticky bottom action bar
-    with ui.row().classes("sticky-bottom-bar w-full"):
-        ui.button("添加项目", on_click=lambda: _show_project_dialog(session, project_table, None))
-        ui.button("删除选中", on_click=lambda: _delete_selected_project(session, project_table))
-
     session._project_table = project_table  # type: ignore[attr-defined]
 
 
@@ -524,9 +537,7 @@ async def _export_projects(session) -> None:
 def _build_validate_and_generate(session: SessionState) -> None:
     ui.label("校验与生成").classes("text-h6")
 
-    # Algorithm info BEFORE the generate button
-    _build_algorithm_info()
-
+    # Validate & generate button FIRST
     ui.button(
         "校验并生成", on_click=lambda: _validate_and_generate(session, progress_label, result_label)
     )
@@ -535,6 +546,9 @@ def _build_validate_and_generate(session: SessionState) -> None:
     session._progress_label = progress_label  # type: ignore[attr-defined]
     session._result_label = result_label  # type: ignore[attr-defined]
     session._validation_label = result_label  # type: ignore[attr-defined]
+
+    # Algorithm info AFTER the generate button
+    _build_algorithm_info()
 
 
 async def _validate_and_generate(session, progress_label, result_label) -> None:
@@ -686,7 +700,7 @@ async def _export_csv(session) -> None:
 
 # --- Algorithm Info ---
 def _build_algorithm_info() -> None:
-    with ui.expansion("算法说明", icon="info").classes("q-mt-md"):
+    with ui.expansion("算法说明", icon="info").classes("q-mt-md w-full"):
         ui.markdown("""
 ### 生成逻辑说明
 
