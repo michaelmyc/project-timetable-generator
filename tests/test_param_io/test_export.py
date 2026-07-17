@@ -23,10 +23,18 @@ def _sample_session() -> SessionParams:
             associated_person_ids=["u1", "u2"],
             ramp_up_point=date(2026, 3, 5),
             maintenance_point=date(2026, 3, 20),
+            business_line="平台",
         ),
     ]
     staff = [
-        StaffInfo(name="u1", job_type="研发人员", business_line="平台", annual_leave_days=5),
+        StaffInfo(
+            name="u1",
+            job_type="研发人员",
+            business_line="平台",
+            annual_leave_days=5,
+            onboard_date=date(2025, 1, 1),
+            leave_date=date(2026, 12, 31),
+        ),
         StaffInfo(name="u2", job_type="测试", business_line=None, annual_leave_days=0),
     ]
     return SessionParams(global_span=span, projects=projects, staff=staff)
@@ -47,7 +55,12 @@ def test_export_session_params(tmp_path: Path):
     assert data["projects"][0]["maintenance_point"] == "2026-03-20"
     assert data["staff"][0]["name"] == "u1"
     assert data["staff"][0]["business_line"] == "平台"
+    assert data["staff"][0]["onboard_date"] == "2025-01-01"
+    assert data["staff"][0]["leave_date"] == "2026-12-31"
     assert data["staff"][1]["business_line"] is None
+    assert data["staff"][1]["onboard_date"] is None
+    assert data["staff"][1]["leave_date"] is None
+    assert data["projects"][0]["business_line"] == "平台"
 
 
 def test_import_params(tmp_path: Path):

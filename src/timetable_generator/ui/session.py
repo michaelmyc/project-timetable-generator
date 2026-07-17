@@ -24,31 +24,33 @@ class SessionState:
     def set_span(self, start: date, end: date) -> None:
         self.global_span = GlobalSpan(start_date=start, end_date=end)
 
-    def add_staff(
-        self,
-        name: str,
-        job_type: str = "研发人员",
-        business_line: str | None = None,
-        annual_leave_days: int = 0,
-    ) -> None:
-        self.staff.append(
-            StaffInfo(
-                name=name,
-                job_type=job_type,
-                business_line=business_line,
-                annual_leave_days=annual_leave_days,
-            )
-        )
+    def add_staff(self, staff: StaffInfo) -> None:
+        self.staff.append(staff)
+
+    def update_staff(self, index: int, staff: StaffInfo) -> None:
+        if 0 <= index < len(self.staff):
+            self.staff[index] = staff
+
+    def remove_staff(self, index: int) -> None:
+        if 0 <= index < len(self.staff):
+            self.staff.pop(index)
 
     def add_project(self, project: Project) -> None:
         self.projects.append(project)
+
+    def update_project(self, index: int, project: Project) -> None:
+        if 0 <= index < len(self.projects):
+            self.projects[index] = project
+
+    def remove_project(self, index: int) -> None:
+        if 0 <= index < len(self.projects):
+            self.projects.pop(index)
 
     def clear_result(self) -> None:
         self.generation_result = None
 
     @property
     def can_generate(self) -> bool:
-        """Check if enough data to generate."""
         return self.global_span is not None and len(self.staff) > 0 and len(self.projects) > 0
 
     @property
@@ -56,5 +58,19 @@ class SessionState:
         return self.generation_result is not None
 
     def get_staff_ids(self) -> list[str]:
-        """Get staff IDs (name-based for MVP)."""
         return [s.name for s in self.staff]
+
+    def get_job_types(self) -> list[str]:
+        """Computed property: unique job types from all staff."""
+        return list({s.job_type for s in self.staff if s.job_type})
+
+    def get_business_lines(self) -> list[str]:
+        """Computed property: unique business lines from all staff + projects."""
+        lines: set[str] = set()
+        for s in self.staff:
+            if s.business_line:
+                lines.add(s.business_line)
+        for p in self.projects:
+            if p.business_line:
+                lines.add(p.business_line)
+        return list(lines)

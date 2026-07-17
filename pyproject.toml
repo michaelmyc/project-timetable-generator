@@ -11,6 +11,7 @@ dependencies = [
     "nicegui>=3.14.0",
     "pywebview>=6.2.1",
     "httpx>=0.28.0",
+    "openpyxl>=3.1.0",
 ]
 
 [project.scripts]

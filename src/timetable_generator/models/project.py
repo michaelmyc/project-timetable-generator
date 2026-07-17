@@ -20,6 +20,8 @@ class Project:
         associated_person_ids: Subset of staff IDs assigned to this project.
         ramp_up_point: Optional lifecycle warmup→full transition date.
         maintenance_point: Optional lifecycle full→maintenance transition date.
+        business_line: Optional business line. May be None. Not used by MVP
+            generation; kept for import/export round-trip fidelity.
     """
 
     id: str
@@ -31,6 +33,7 @@ class Project:
     associated_person_ids: list[str]
     ramp_up_point: date | None = None
     maintenance_point: date | None = None
+    business_line: str | None = None
 
     def __post_init__(self) -> None:
         self._validate()

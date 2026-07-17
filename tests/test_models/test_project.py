@@ -71,3 +71,20 @@ def test_project_empty_associated_persons_raises():
             id="p1", name="A", start_date=date(2026, 1, 1), end_date=date(2026, 3, 31),
             target_ratio=0.3, required_job_types=["研发人员"], associated_person_ids=[],
         )
+
+
+def test_project_business_line_default_none():
+    p = Project(
+        id="p1", name="A", start_date=date(2026, 1, 1), end_date=date(2026, 3, 31),
+        target_ratio=0.3, required_job_types=["研发人员"], associated_person_ids=["u1"],
+    )
+    assert p.business_line is None
+
+
+def test_project_business_line_set():
+    p = Project(
+        id="p1", name="A", start_date=date(2026, 1, 1), end_date=date(2026, 3, 31),
+        target_ratio=0.3, required_job_types=["研发人员"],
+        associated_person_ids=["u1"], business_line="平台",
+    )
+    assert p.business_line == "平台"

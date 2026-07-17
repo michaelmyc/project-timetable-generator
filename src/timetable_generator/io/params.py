@@ -64,6 +64,7 @@ def _project_to_dict(p: Project) -> dict:
         "associated_person_ids": list(p.associated_person_ids),
         "ramp_up_point": _serialize_date(p.ramp_up_point),
         "maintenance_point": _serialize_date(p.maintenance_point),
+        "business_line": p.business_line,
     }
 
 
@@ -78,6 +79,7 @@ def _project_from_dict(data: dict) -> Project:
         associated_person_ids=list(data["associated_person_ids"]),
         ramp_up_point=_parse_date(data.get("ramp_up_point")),
         maintenance_point=_parse_date(data.get("maintenance_point")),
+        business_line=data.get("business_line"),
     )
 
 
@@ -87,6 +89,8 @@ def _staff_to_dict(s: StaffInfo) -> dict:
         "job_type": s.job_type,
         "business_line": s.business_line,
         "annual_leave_days": s.annual_leave_days,
+        "onboard_date": _serialize_date(s.onboard_date),
+        "leave_date": _serialize_date(s.leave_date),
     }
 
 
@@ -96,6 +100,8 @@ def _staff_from_dict(data: dict) -> StaffInfo:
         job_type=data.get("job_type") or StaffInfo().job_type,
         business_line=data.get("business_line"),
         annual_leave_days=data.get("annual_leave_days", 0),
+        onboard_date=_parse_date(data.get("onboard_date")),
+        leave_date=_parse_date(data.get("leave_date")),
     )
 
 
