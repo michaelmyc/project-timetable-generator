@@ -269,7 +269,6 @@ def _build_project_management(session: SessionState) -> None:
 
     project_table = ui.table(
         columns=[
-            {"name": "id", "label": "项目标识", "field": "id"},
             {"name": "name", "label": "项目名称", "field": "name"},
             {"name": "target_ratio", "label": "投入比例", "field": "target_ratio"},
             {"name": "required_job_types", "label": "所需工种", "field": "required_job_types"},
@@ -278,7 +277,7 @@ def _build_project_management(session: SessionState) -> None:
             {"name": "end_date", "label": "结束时间", "field": "end_date"},
         ],
         rows=[],
-        row_key="id",
+        row_key="name",
     )
 
     with ui.row():
@@ -295,8 +294,6 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
         ui.label(title).classes("text-h6")
 
         existing = session.projects[edit_index] if edit_index is not None else None
-
-        pid_input = ui.input(label="项目标识", value=existing.id if existing else "")
         pname_input = ui.input(label="项目名称", value=existing.name if existing else "")
         ui.label("业务线: 【暂不考虑】").classes("text-caption text-grey")
         bl_input = ui.input(
@@ -325,11 +322,11 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
         )
 
         def _save():
-            pid = (pid_input.value or "").strip()
             pname = (pname_input.value or "").strip()
-            if not pid or not pname:
-                ui.notify("标识和名称不能为空", type="warning")
+            if not pname:
+                ui.notify("项目名称不能为空", type="warning")
                 return
+            pid = pname  # id = name (合并)
             ratio = float(ratio_input.value)
             bl = (bl_input.value or "").strip() or None
             if session.global_span is None:
@@ -383,8 +380,8 @@ def _edit_selected_project(session, project_table) -> None:
     if not selected:
         ui.notify("请先选择一行", type="warning")
         return
-    pid = selected[0].get("id", "")
-    index = next((i for i, p in enumerate(session.projects) if p.id == pid), None)
+    pname = selected[0].get("name", "")
+    index = next((i for i, p in enumerate(session.projects) if p.name == pname), None)
     if index is not None:
         _show_project_dialog(session, project_table, index)
 
@@ -395,12 +392,12 @@ def _delete_selected_project(session, project_table) -> None:
     if not selected:
         ui.notify("请先选择一行", type="warning")
         return
-    pid = selected[0].get("id", "")
-    index = next((i for i, p in enumerate(session.projects) if p.id == pid), None)
+    pname = selected[0].get("name", "")
+    index = next((i for i, p in enumerate(session.projects) if p.name == pname), None)
     if index is not None:
         session.remove_project(index)
         _refresh_project_table(session, project_table)
-        ui.notify(f"已删除: {pid}")
+        ui.notify(f"已删除: {pname}")
 
 
 def _refresh_project_table(session, project_table) -> None:
@@ -408,12 +405,12 @@ def _refresh_project_table(session, project_table) -> None:
     for p in session.projects:
         rows.append(
             {
-                "id": p.id,
                 "name": p.name,
                 "target_ratio": f"{p.target_ratio:.0%}",
                 "required_job_types": ", ".join(p.required_job_types)
                 if p.required_job_types
                 else "无约束",
+                "business_line": p.business_line or "—",
                 "start_date": p.start_date.isoformat(),
                 "end_date": p.end_date.isoformat(),
             }
