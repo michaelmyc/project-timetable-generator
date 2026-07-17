@@ -21,6 +21,7 @@ class SessionState:
     generation_result: GenerationResult | None = None
     holiday_fallback: bool = False
     job_types: list[str] = field(default_factory=lambda: ["研发人员"])
+    business_lines: list[str] = field(default_factory=list)
 
     def set_span(self, start: date, end: date) -> None:
         self.global_span = GlobalSpan(start_date=start, end_date=end)
@@ -77,12 +78,16 @@ class SessionState:
             self.add_job_type(jt)
 
     def get_business_lines(self) -> list[str]:
-        """Computed property: unique business lines from all staff + projects."""
-        lines: set[str] = set()
-        for s in self.staff:
-            if s.business_line:
-                lines.add(s.business_line)
-        for p in self.projects:
-            if p.business_line:
-                lines.add(p.business_line)
-        return list(lines)
+        """Return the session-level business line list."""
+        return self.business_lines
+
+    def add_business_line(self, bl: str) -> None:
+        """Add a business line to the session list if not already present."""
+        bl = bl.strip() if bl else ""
+        if bl and bl not in self.business_lines:
+            self.business_lines.append(bl)
+
+    def add_business_lines(self, bls: list[str]) -> None:
+        """Add multiple business lines to the session list."""
+        for bl in bls:
+            self.add_business_line(bl)

@@ -137,11 +137,13 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             with_input=True,
             new_value_mode="add",
         )
-        # Business line: 暂不考虑
-        ui.label("业务线: 【暂不考虑】（导入导出保留）").classes("text-caption text-grey")
-        bl_input = ui.input(
-            label="业务线（可选）",
+        # Business line: select from session list, allow new
+        bl_input = ui.select(
+            label="业务线",
+            options=session.business_lines,
             value=existing.business_line if existing else None,
+            with_input=True,
+            new_value_mode="add",
         )
         ui.label("入职时间: 【暂不考虑】").classes("text-caption text-grey")
         onboard_input = ui.input(
@@ -161,7 +163,9 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
                 return
             job = str(job_input.value or "").strip() or DEFAULT_JOB_TYPE
             session.add_job_type(job)
-            bl = (bl_input.value or "").strip() or None
+            bl = str(bl_input.value or "").strip() or None
+            if bl:
+                session.add_business_line(bl)
             onboard = (
                 date.fromisoformat((onboard_input.value or "").strip())
                 if onboard_input.value and (onboard_input.value or "").strip()
@@ -244,6 +248,7 @@ def _import_staff(session, staff_table) -> None:
                 imported = import_staff_csv(tmp)
                 session.staff.extend(imported)
                 session.add_job_types([s.job_type for s in imported if s.job_type])
+                session.add_business_lines([s.business_line for s in imported if s.business_line])
                 _refresh_staff_table(session, staff_table)
                 ui.notify(f"导入 {len(imported)} 名员工", type="positive")
                 dialog.close()
@@ -278,7 +283,6 @@ def _build_project_management(session: SessionState) -> None:
         columns=[
             {"name": "name", "label": "项目名称", "field": "name"},
             {"name": "target_ratio", "label": "投入比例", "field": "target_ratio"},
-            {"name": "required_job_types", "label": "所需工种", "field": "required_job_types"},
             {"name": "business_line", "label": "业务线【暂不考虑】", "field": "business_line"},
             {"name": "start_date", "label": "开始时间", "field": "start_date"},
             {"name": "end_date", "label": "结束时间", "field": "end_date"},
@@ -312,9 +316,13 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
 
         existing = session.projects[edit_index] if edit_index is not None else None
         pname_input = ui.input(label="项目名称", value=existing.name if existing else "")
-        ui.label("业务线: 【暂不考虑】").classes("text-caption text-grey")
-        bl_input = ui.input(
-            label="业务线（可选）", value=existing.business_line if existing else None
+        # Business line: select from session list, allow new
+        bl_input = ui.select(
+            label="业务线",
+            options=session.business_lines,
+            value=existing.business_line if existing else None,
+            with_input=True,
+            new_value_mode="add",
         )
         ratio_input = ui.number(
             label="投入比例 (0-1)",
@@ -345,7 +353,9 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
                 return
             pid = pname  # id = name (合并)
             ratio = float(ratio_input.value) if ratio_input.value is not None else 0.0
-            bl = (bl_input.value or "").strip() or None
+            bl = str(bl_input.value or "").strip() or None
+            if bl:
+                session.add_business_line(bl)
             # Dates: use date_input values, fallback to global span if set
             sd_str = str(start_input.value).strip() if start_input.value else ""
             ed_str = str(end_input.value).strip() if end_input.value else ""
@@ -445,6 +455,8 @@ def _import_projects(session) -> None:
                 session.projects.extend(imported)
                 for p in imported:
                     session.add_job_types(p.required_job_types)
+                    if p.business_line:
+                        session.add_business_line(p.business_line)
                 _refresh_project_table(session, session._project_table)  # type: ignore[attr-defined]
                 ui.notify(f"导入 {len(imported)} 个项目", type="positive")
                 dialog.close()
