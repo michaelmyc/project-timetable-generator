@@ -283,6 +283,7 @@ def _build_project_management(session: SessionState) -> None:
         columns=[
             {"name": "name", "label": "项目名称", "field": "name"},
             {"name": "target_ratio", "label": "投入比例", "field": "target_ratio"},
+            {"name": "required_job_types", "label": "所需工种", "field": "required_job_types"},
             {"name": "business_line", "label": "业务线【暂不考虑】", "field": "business_line"},
             {"name": "start_date", "label": "开始时间", "field": "start_date"},
             {"name": "end_date", "label": "结束时间", "field": "end_date"},
@@ -326,6 +327,7 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
         )
         ratio_input = ui.number(
             label="投入比例 (0-1)",
+            value=existing.target_ratio if existing else 0.3,
             min=0,
             max=1,
             step=0.01,
