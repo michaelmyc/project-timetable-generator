@@ -75,7 +75,7 @@ def build_ui() -> SessionState:
     # Inject CSS before rendering (ensure sticky works)
     ui.add_head_html("""<style>
     .sticky-top { position: sticky !important; top: 0; z-index: 1000; background: white; }
-    .sticky-bottom-bar { position: sticky; bottom: 0; background: white; padding: 10px; z-index: 100; border-top: 1px solid #eee; }
+    .sticky-bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 10px; z-index: 1000; border-top: 1px solid #eee; }
     </style>""")
 
     # --- Sticky top navigation with tabs ---
