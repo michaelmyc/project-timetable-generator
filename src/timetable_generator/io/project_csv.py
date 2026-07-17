@@ -6,7 +6,7 @@ CSV/Excel format (UTF-8, optional BOM for CSV):
 Notes:
     * 投入百分比 is a float ratio in [0, 1] (e.g. 0.3, not 30%).
     * 项目开始/结束时间 use ISO format YYYY-MM-DD; blank falls back to the
-      caller-supplied default_start / default_end.
+      blank dates raise ValueError.
     * `required_job_types` defaults to an empty list (no job-type constraint).
     * `associated_person_ids` defaults to ``["__pending__"]`` to satisfy
       Project's non-empty invariant until the user associates staff via the UI.
@@ -94,13 +94,13 @@ def _read_xlsx(path: Path) -> tuple[list[str], list[dict[str, str]]]:
     return header_cols, data_rows
 
 
-def import_projects_csv(path: Path, default_start: date, default_end: date) -> list[Project]:
+def import_projects_csv(path: Path) -> list[Project]:
     """Import projects from a CSV or Excel file at *path* (6 columns).
 
     `required_job_types` defaults to an empty list. `associated_person_ids`
     defaults to ``["__pending__"]`` to satisfy Project's non-empty invariant
     until the user associates staff via the UI.
-    Dates fall back to *default_start* / *default_end* when blank.
+    Dates must be present in the file; blank dates raise ValueError.
     """
     fieldnames, rows = _read_rows(path)
     missing = [c for c in REQUIRED_COLUMNS if c not in fieldnames]
@@ -116,8 +116,10 @@ def import_projects_csv(path: Path, default_start: date, default_end: date) -> l
         business_line = _clean(row.get("业务线"))
         ratio_raw = _clean(row.get("投入百分比"))
         target_ratio = float(ratio_raw) if ratio_raw else 0.0
-        start_date = _parse_date_cell(row.get("项目开始时间")) or default_start
-        end_date = _parse_date_cell(row.get("项目结束时间")) or default_end
+        start_date = _parse_date_cell(row.get("项目开始时间"))
+        end_date = _parse_date_cell(row.get("项目结束时间"))
+        if not start_date or not end_date:
+            raise ValueError(f"项目 {pid} 缺少开始或结束时间")
         projects.append(
             Project(
                 id=pid,

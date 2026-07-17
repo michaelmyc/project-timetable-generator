@@ -26,10 +26,10 @@ def test_import_projects_csv_six_columns(tmp_path: Path):
     csv_text = (
         "项目标识,项目名称,业务线,投入百分比,项目开始时间,项目结束时间\n"
         "p1,项目A,平台,0.3,2026-01-15,2026-02-15\n"
-        "p2,项目B,,0.5,,\n"
+        "p2,项目B,,0.5,2026-03-01,2026-04-01\n"
     )
     path = _write(tmp_path / "projects.csv", csv_text)
-    projects = import_projects_csv(path, DEFAULT_START, DEFAULT_END)
+    projects = import_projects_csv(path)
     assert len(projects) == 2
     assert projects[0].id == "p1"
     assert projects[0].name == "项目A"
@@ -40,9 +40,9 @@ def test_import_projects_csv_six_columns(tmp_path: Path):
     assert projects[0].required_job_types == []
     assert projects[0].associated_person_ids == [PENDING_PERSON_ID]
 
-    # blank dates fall back to defaults
-    assert projects[1].start_date == DEFAULT_START
-    assert projects[1].end_date == DEFAULT_END
+    # p2 has explicit dates
+    assert projects[1].start_date == date(2026, 3, 1)
+    assert projects[1].end_date == date(2026, 4, 1)
     assert projects[1].business_line is None
 
 
@@ -50,7 +50,7 @@ def test_import_projects_csv_missing_columns_raises(tmp_path: Path):
     csv_text = "项目标识,项目名称\np1,A\n"
     path = _write(tmp_path / "bad.csv", csv_text)
     with pytest.raises(ValueError, match="missing required columns"):
-        import_projects_csv(path, DEFAULT_START, DEFAULT_END)
+        import_projects_csv(path)
 
 
 def test_import_projects_csv_skips_blank_rows(tmp_path: Path):
@@ -61,7 +61,7 @@ def test_import_projects_csv_skips_blank_rows(tmp_path: Path):
         "\n"
     )
     path = _write(tmp_path / "blanks.csv", csv_text)
-    projects = import_projects_csv(path, DEFAULT_START, DEFAULT_END)
+    projects = import_projects_csv(path)
     assert len(projects) == 1
     assert projects[0].id == "p1"
 
@@ -113,7 +113,7 @@ def test_export_import_projects_csv_roundtrip(tmp_path: Path):
     ]
     path = tmp_path / "roundtrip.csv"
     export_projects_csv(original, path)
-    restored = import_projects_csv(path, DEFAULT_START, DEFAULT_END)
+    restored = import_projects_csv(path)
     assert restored == original
 
 
@@ -138,5 +138,5 @@ def test_projects_xlsx_roundtrip(tmp_path: Path):
     ]
     path = tmp_path / "projects.xlsx"
     export_projects_csv(original, path)
-    restored = import_projects_csv(path, DEFAULT_START, DEFAULT_END)
+    restored = import_projects_csv(path)
     assert restored == original

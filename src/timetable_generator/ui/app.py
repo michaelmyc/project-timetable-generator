@@ -353,7 +353,9 @@ def _refresh_project_table(session, project_table) -> None:
                 "id": p.id,
                 "name": p.name,
                 "target_ratio": f"{p.target_ratio:.0%}",
-                "required_job_types": ", ".join(p.required_job_types) if p.required_job_types else "无约束",
+                "required_job_types": ", ".join(p.required_job_types)
+                if p.required_job_types
+                else "无约束",
                 "start_date": p.start_date.isoformat(),
                 "end_date": p.end_date.isoformat(),
             }
@@ -363,9 +365,6 @@ def _refresh_project_table(session, project_table) -> None:
 
 def _import_projects(session) -> None:
     """Import projects via file picker (ui.upload)."""
-    if session.global_span is None:
-        ui.notify("请先设定全局区间", type="warning")
-        return
     with ui.dialog() as dialog, ui.card():
         ui.label("导入项目").classes("text-h6")
         ui.label("格式: 项目标识,项目名称,业务线,投入百分比,项目开始时间,项目结束时间").classes(
@@ -377,8 +376,7 @@ def _import_projects(session) -> None:
                 content = e.content.read()
                 tmp = Path("/tmp/_project_import.tmp")
                 tmp.write_bytes(content)
-                span = session.global_span
-                imported = import_projects_csv(tmp, span.start_date, span.end_date)
+                imported = import_projects_csv(tmp)
                 session.projects.extend(imported)
                 _refresh_project_table(session, session._project_table)  # type: ignore[attr-defined]
                 ui.notify(f"导入 {len(imported)} 个项目", type="positive")
