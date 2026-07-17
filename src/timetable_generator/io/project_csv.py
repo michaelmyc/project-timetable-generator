@@ -117,8 +117,7 @@ def import_projects_csv(path: Path) -> list[Project]:
         target_ratio = float(ratio_raw) if ratio_raw else 0.0
         start_date = _parse_date_cell(row.get("项目开始时间"))
         end_date = _parse_date_cell(row.get("项目结束时间"))
-        if not start_date or not end_date:
-            raise ValueError(f"项目 {name} 缺少开始或结束时间")
+        # Dates are optional — None means use global span at generation time
         projects.append(
             Project(
                 id=pid,
