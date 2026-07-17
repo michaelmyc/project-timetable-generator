@@ -39,7 +39,7 @@ RATIO_TOLERANCE = 0.08
 async def _download_file(data: bytes, filename: str) -> None:
     """Download file: native mode uses pywebview save dialog, web mode uses ui.download."""
 
-    if "--native" in sys.argv:
+    if "--native" in sys.argv or getattr(sys, "frozen", False):
         # Native/webview mode: use NiceGUI main_window save dialog
         from nicegui import app as nicegui_app
         from webview import FileDialog

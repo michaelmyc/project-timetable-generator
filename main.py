@@ -4,6 +4,10 @@ Run mode:
   uv run python main.py              # web server (browser, default, for debugging)
   uv run python main.py --native     # native window (pywebview)
   uv run python main.py --port 9000  # custom port
+  uv run python main.py --web        # force web server (overrides frozen default)
+
+When packaged with PyInstaller (frozen), defaults to native window mode
+unless --web is explicitly passed.
 """
 
 import sys
@@ -27,7 +31,11 @@ def index() -> None:
 
 def main() -> None:
     """Run the timetable generator UI."""
-    native = "--native" in sys.argv
+    # Frozen (PyInstaller) defaults to native; dev defaults to web server
+    is_frozen = getattr(sys, "frozen", False)
+    force_web = "--web" in sys.argv
+    native = ("--native" in sys.argv) or (is_frozen and not force_web)
+
     port = 8080
     for i, arg in enumerate(sys.argv):
         if arg == "--port" and i + 1 < len(sys.argv):

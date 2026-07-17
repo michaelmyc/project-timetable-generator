@@ -1,14 +1,11 @@
 """Console script entry point — shared with main.py.
 
-Run mode:
-  timetable-generator              # web server (browser, default)
-  timetable-generator --native     # native window (pywebview)
-  timetable-generator --port 9000  # custom port
+When packaged with PyInstaller (frozen), defaults to native window mode
+unless --web is explicitly passed.
 """
 
-import sys
-
 import multiprocessing
+import sys
 
 from nicegui import app, ui
 
@@ -26,7 +23,10 @@ def index() -> None:
 
 def main() -> None:
     """Run the timetable generator UI."""
-    native = "--native" in sys.argv
+    is_frozen = getattr(sys, "frozen", False)
+    force_web = "--web" in sys.argv
+    native = ("--native" in sys.argv) or (is_frozen and not force_web)
+
     port = 8080
     for i, arg in enumerate(sys.argv):
         if arg == "--port" and i + 1 < len(sys.argv):
