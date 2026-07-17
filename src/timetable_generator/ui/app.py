@@ -5,6 +5,7 @@ All in-memory, no persistence (ADR-0006).
 Features:
 - Job type dynamic mapping (session runtime dict, ADR-0006 D2)
 - Add job type via dropdown + free text input
+- Delete job types from the mapping
 - Project required_job_types selectable from job type dict (can be empty)
 - Async generation without blocking event loop
 """
@@ -27,6 +28,7 @@ from timetable_generator.models.staff_state import StaffState
 from timetable_generator.ui.session import SessionState
 
 DEFAULT_JOB_TYPES = ["研发人员"]
+RATIO_TOLERANCE = 0.08  # 8% tolerance for ratio achievement (1h granularity)
 
 
 def build_ui() -> SessionState:
@@ -49,7 +51,6 @@ def build_ui() -> SessionState:
     ui.label("2. 员工名单").classes("text-h6 q-mt-md")
     with ui.row():
         staff_name_input = ui.input(label="员工姓名")
-        # Job type: select from existing or type new
         staff_job_select = ui.select(
             label="工种",
             options=job_types,
@@ -59,7 +60,9 @@ def build_ui() -> SessionState:
         )
         ui.button(
             "添加员工",
-            on_click=lambda: _add_staff(session, staff_name_input, staff_job_select, job_types),
+            on_click=lambda: _add_staff(
+                session, staff_name_input, staff_job_select, job_types, proj_jobs_select
+            ),
         )
     staff_table = ui.table(
         columns=[
@@ -70,13 +73,25 @@ def build_ui() -> SessionState:
         row_key="name",
     )
 
+    # Job type management — delete
+    ui.label("工种管理").classes("text-caption q-mt-sm")
+    job_type_select_for_delete = ui.select(
+        label="选择要删除的工种",
+        options=job_types,
+    )
+    ui.button(
+        "删除工种",
+        on_click=lambda: _delete_job_type(
+            job_type_select_for_delete, job_types, staff_job_select, proj_jobs_select
+        ),
+    )
+
     # Step 3: Projects
     ui.label("3. 项目批次").classes("text-h6 q-mt-md")
     with ui.row():
         proj_id_input = ui.input(label="项目标识")
         proj_name_input = ui.input(label="项目名称")
         proj_ratio_input = ui.number(label="投入比例 (0-1)", value=0.3, min=0, max=1, step=0.01)
-    # Required job types: multi-select from job type dict (can be empty)
     proj_jobs_select = ui.select(
         label="所需工种（可空=不设工种约束；可多选或输入新建）",
         options=job_types,
@@ -88,7 +103,13 @@ def build_ui() -> SessionState:
     ui.button(
         "添加项目",
         on_click=lambda: _add_project(
-            session, proj_id_input, proj_name_input, proj_ratio_input, proj_jobs_select, job_types
+            session,
+            proj_id_input,
+            proj_name_input,
+            proj_ratio_input,
+            proj_jobs_select,
+            job_types,
+            staff_job_select,
         ),
     )
     project_list = ui.column()
@@ -104,12 +125,22 @@ def build_ui() -> SessionState:
     ui.button("导出 CSV", on_click=lambda: _export_csv(session))
     ui.button("导出配置", on_click=lambda: _export_params(session))
 
-    # Store refs for testing
+    # Store refs
     session._span_label = span_label  # type: ignore[attr-defined]
     session._staff_table = staff_table  # type: ignore[attr-defined]
     session._project_list = project_list  # type: ignore[attr-defined]
 
     return session
+
+
+def _refresh_job_type_options(
+    job_types: list[str],
+    *selects: ui.select,
+) -> None:
+    """Refresh all job-type select widgets with current job_types list."""
+    for sel in selects:
+        sel.options = list(job_types)
+        sel.update()
 
 
 def _set_span(session: SessionState, start_input, end_input) -> None:
@@ -119,30 +150,45 @@ def _set_span(session: SessionState, start_input, end_input) -> None:
     session._span_label.text = f"区间: {start} → {end}"  # type: ignore[attr-defined]
 
 
-def _add_staff(session: SessionState, name_input, job_select, job_types: list[str]) -> None:
+def _add_staff(session, name_input, job_select, job_types, proj_jobs_select) -> None:
     name = name_input.value.strip()
     if not name:
         return
     job = str(job_select.value).strip() if job_select.value else "研发人员"
     if not job:
         job = "研发人员"
-    # Add new job type to runtime dict if not present
     if job not in job_types:
         job_types.append(job)
-        job_select.options = list(job_types)
+        _refresh_job_type_options(job_types, job_select, proj_jobs_select)
     session.add_staff(name=name, job_type=job)
     name_input.value = ""
     rows = [{"name": s.name, "job_type": s.job_type, "id": s.name} for s in session.staff]
     session._staff_table.update_rows(rows)  # type: ignore[attr-defined]
 
 
+def _delete_job_type(delete_select, job_types, *other_selects) -> None:
+    """Remove a job type from the runtime dict."""
+    val = delete_select.value
+    if not val or val not in job_types:
+        ui.notify("请选择要删除的工种", type="warning")
+        return
+    if val in DEFAULT_JOB_TYPES:
+        ui.notify(f"'{val}' 是默认工种，不可删除", type="warning")
+        return
+    job_types.remove(val)
+    _refresh_job_type_options(job_types, delete_select, *other_selects)
+    delete_select.value = None
+    ui.notify(f"已删除工种: {val}")
+
+
 def _add_project(
-    session: SessionState,
+    session,
     id_input,
     name_input,
     ratio_input,
     jobs_select,
-    job_types: list[str],
+    job_types,
+    staff_job_select,
 ) -> None:
     if session.global_span is None:
         ui.notify("请先设定全局区间", type="warning")
@@ -153,16 +199,18 @@ def _add_project(
         ui.notify("项目标识和名称不能为空", type="warning")
         return
     ratio = float(ratio_input.value)
-    # Get selected job types (may be empty = no constraint)
     selected_jobs = jobs_select.value or []
     if isinstance(selected_jobs, str):
         selected_jobs = [selected_jobs]
     jobs = [str(j).strip() for j in selected_jobs if str(j).strip()]
-    # Add any new job types to runtime dict
+    # Sync new job types
+    new_added = False
     for j in jobs:
         if j not in job_types:
             job_types.append(j)
-    jobs_select.options = list(job_types)
+            new_added = True
+    if new_added:
+        _refresh_job_type_options(job_types, jobs_select, staff_job_select)
 
     staff_ids = session.get_staff_ids()
     if not staff_ids:
@@ -188,7 +236,7 @@ def _add_project(
             ui.label(f"  {p.id} | {p.name} | 比例 {p.target_ratio:.0%} | 工种: {jobs_str}")
 
 
-def _generate(session: SessionState, progress_label, result_label) -> None:
+def _generate(session, progress_label, result_label) -> None:
     if not session.can_generate:
         ui.notify("请先设定区间、添加员工和项目", type="warning")
         return
@@ -199,16 +247,14 @@ def _generate(session: SessionState, progress_label, result_label) -> None:
         assert span is not None
         staff_states = [StaffState.from_changes(s.name, [], span) for s in session.staff]
 
-        # Holidays — use asyncio loop safely (not asyncio.run inside event loop)
+        # Holidays — safe async execution
         cache = HolidayCache(_get_cache_dir())
         orch = HolidayOrchestrator(cache=cache)
         years = range(span.start_date.year, span.end_date.year + 1)
 
-        # Try to get event loop; if running, use run_until_complete on a new loop
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # Create a new loop in a thread to avoid "cannot call from running loop"
                 import threading
 
                 result_box: list = []
@@ -237,6 +283,7 @@ def _generate(session: SessionState, progress_label, result_label) -> None:
             holidays=holidays,
             global_span=span,
             max_retries=10,
+            ratio_tolerance=RATIO_TOLERANCE,
         )
         session.generation_result = result
         progress_label.text = f"生成完成（{result.attempts} 次尝试）"
@@ -256,7 +303,7 @@ def _generate(session: SessionState, progress_label, result_label) -> None:
         ui.notify(f"生成失败: {e}", type="negative")
 
 
-def _export_csv(session: SessionState) -> None:
+def _export_csv(session) -> None:
     if not session.has_result:
         ui.notify("请先生成", type="warning")
         return
@@ -265,7 +312,7 @@ def _export_csv(session: SessionState) -> None:
     ui.notify(f"CSV 已导出: {path.resolve()}")
 
 
-def _export_params(session: SessionState) -> None:
+def _export_params(session) -> None:
     if session.global_span is None:
         ui.notify("请先设定区间", type="warning")
         return

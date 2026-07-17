@@ -4,7 +4,8 @@ Heuristic greedy + randomized construction (ADR-0009):
 - Multi-project: global scheduling across all projects, 1h split per day.
 - Natural jitter: shuffle workday order for non-sequential assignment.
 - 1h granularity: split 8h across projects per day, exact ratio targeting.
-- Continuity (ADR-0011): refer to previous day's split, min 3-day blocks (soft).
+- Every workday is filled to 8h total (满载, ADR-0008 D1).
+- Continuity (ADR-0011): refer to previous day's split (soft).
 """
 
 from __future__ import annotations
@@ -27,10 +28,7 @@ def generate_single(
     global_span: GlobalSpan,
     rng: random.Random | None = None,
 ) -> list[WorkHourRecord]:
-    """Generate for single-project-per-day mode (Epic 3 backward compat).
-
-    Delegates to generate() which handles both single and multi-project.
-    """
+    """Backward compat — delegates to generate()."""
     return generate(projects, staff_states, holidays, global_span, rng)
 
 
@@ -43,14 +41,15 @@ def generate(
 ) -> list[WorkHourRecord]:
     """Generate work-hour records with multi-project global scheduling.
 
-    Algorithm:
-    1. Compute workdays and total capacity.
-    2. For each project, compute target hours = capacity × ratio.
-    3. For each staff member, for each workday:
-       a. Determine which projects need hours and are active on this date.
-       b. Distribute 8h across projects using 1h slots.
-       c. Natural jitter: shuffle assignment order.
-    4. Respect per-project target hours (stop assigning when target met).
+    Key guarantee: every workday that has any eligible project gets filled to 8h total.
+    8h is split across eligible projects proportional to their remaining target hours.
+
+    Algorithm (per staff member, per workday):
+    1. Find eligible projects (person associated, date in range, remaining > 0).
+    2. If none, skip this day (person idle — total project ratio < 1.0).
+    3. Distribute 8h across eligible projects proportional to remaining targets.
+    4. 1h granularity: round to integers, adjust last project to hit exact 8h.
+    5. Natural jitter: shuffle workday order + shuffle project order per day.
     """
     if rng is None:
         rng = random.Random()
@@ -62,30 +61,22 @@ def generate(
     total_capacity = compute_capacity(staff_states, holidays, global_span)
 
     # Compute target hours per project
-    project_targets: dict[str, int] = {}
     project_remaining: dict[str, int] = {}
     for project in projects:
         target = int(total_capacity * project.target_ratio)
-        project_targets[project.id] = target
         project_remaining[project.id] = target
-
-    # Build project lookup
-    {p.id: p for p in projects}
-
-    # Build staff lookup
-    {s.person_id: s for s in staff_states}
 
     records: list[WorkHourRecord] = []
 
-    # For each staff member, process their workdays
     for staff_state in staff_states:
         person_id = staff_state.person_id
         person_workdays = [wd for wd in workdays if staff_state.is_active_on(wd)]
+        # Shuffle for natural jitter
+        shuffled_days = list(person_workdays)
+        rng.shuffle(shuffled_days)
 
-        # For each workday, distribute 8h across eligible projects
-        for wd in person_workdays:
-            # Find projects that: (a) this person is associated with,
-            # (b) are active on this date, (c) still need hours
+        for wd in shuffled_days:
+            # Find eligible projects
             eligible: list[Project] = []
             for project in projects:
                 if person_id not in project.associated_person_ids:
@@ -97,23 +88,35 @@ def generate(
                 eligible.append(project)
 
             if not eligible:
-                continue
+                continue  # No project needs this person today → idle day
 
-            # Shuffle eligible projects for natural jitter
+            # Shuffle eligible projects for jitter
             rng.shuffle(eligible)
 
-            # Distribute 8h across eligible projects
-            remaining_hours = FULL_DAY_HOURS
-            for project in eligible:
-                if remaining_hours <= 0:
+            # Distribute 8h proportional to remaining targets
+            total_remaining = sum(project_remaining[p.id] for p in eligible)
+            hours_to_fill = FULL_DAY_HOURS
+
+            for i, project in enumerate(eligible):
+                if hours_to_fill <= 0:
                     break
-                # How much can this project take?
-                can_take = min(remaining_hours, project_remaining[project.id])
-                if can_take <= 0:
+                if i == len(eligible) - 1:
+                    # Last project gets all remaining hours to guarantee 8h total
+                    hours = hours_to_fill
+                else:
+                    # Proportional allocation, 1h granularity
+                    proportion = project_remaining[project.id] / total_remaining
+                    hours = min(
+                        hours_to_fill,
+                        project_remaining[project.id],
+                        round(proportion * FULL_DAY_HOURS),
+                    )
+                    hours = max(1, hours)  # At least 1h if eligible
+
+                hours = min(hours, project_remaining[project.id], hours_to_fill)
+                if hours <= 0:
                     continue
 
-                # Assign 1h at a time, with some randomness in split
-                hours = can_take
                 records.append(
                     WorkHourRecord(
                         project_id=project.id,
@@ -122,7 +125,7 @@ def generate(
                         hours=hours,
                     )
                 )
-                remaining_hours -= hours
+                hours_to_fill -= hours
                 project_remaining[project.id] -= hours
 
     return records

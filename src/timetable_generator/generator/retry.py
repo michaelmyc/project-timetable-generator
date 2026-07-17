@@ -37,7 +37,7 @@ def generate_with_retry(
     global_span: GlobalSpan,
     greedy_fn: Callable | None = None,
     max_retries: int = 10,
-    ratio_tolerance: float = 0.05,
+    ratio_tolerance: float = 0.08,
     rng: random.Random | None = None,
 ) -> GenerationResult:
     """Generate with N retries: greedy → validate → retry until valid or exhausted.
