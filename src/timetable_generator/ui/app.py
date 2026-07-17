@@ -168,22 +168,20 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             with_input=True,
             new_value_mode="add",
         )
-        # Business line: select from session list, allow new
         bl_input = ui.select(
-            label="业务线",
+            label="业务线【暂不考虑】",
             options=session.business_lines,
             value=existing.business_line if existing else None,
             with_input=True,
             new_value_mode="add",
         )
-        ui.label("入职时间: 【暂不考虑】").classes("text-caption text-grey")
-        onboard_input = ui.input(
-            label="入职时间 (YYYY-MM-DD，可选)",
+        # Onboard/leave dates: 暂不考虑 but editable for import/export
+        onboard_input = ui.date_input(
+            label="入职时间【暂不考虑】",
             value=existing.onboard_date.isoformat() if existing and existing.onboard_date else None,
         )
-        ui.label("离职时间: 【暂不考虑】").classes("text-caption text-grey")
-        leave_input = ui.input(
-            label="离职时间 (YYYY-MM-DD，可选)",
+        leave_input = ui.date_input(
+            label="离职时间【暂不考虑】",
             value=existing.leave_date.isoformat() if existing and existing.leave_date else None,
         )
 
@@ -197,16 +195,8 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             bl = str(bl_input.value or "").strip() or None
             if bl:
                 session.add_business_line(bl)
-            onboard = (
-                date.fromisoformat((onboard_input.value or "").strip())
-                if onboard_input.value and (onboard_input.value or "").strip()
-                else None
-            )
-            leave = (
-                date.fromisoformat((leave_input.value or "").strip())
-                if leave_input.value and (leave_input.value or "").strip()
-                else None
-            )
+            onboard = date.fromisoformat(str(onboard_input.value)) if onboard_input.value else None
+            leave = date.fromisoformat(str(leave_input.value)) if leave_input.value else None
             staff = StaffInfo(
                 name=name,
                 job_type=job,
