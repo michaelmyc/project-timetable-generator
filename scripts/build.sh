@@ -79,3 +79,10 @@ uv run --no-dev --isolated --with pyinstaller nicegui-pack \
   main.py
 
 echo "Build complete → dist/$APP_NAME"
+
+# macOS: clear extended attributes that prevent unsigned .app from opening
+# (com.apple.provenance / com.apple.quarantine cause "installer pagecontroller error")
+if [[ "$(uname -s)" == "Darwin" && -d "dist/${APP_NAME}.app" ]]; then
+  xattr -cr "dist/${APP_NAME}.app"
+  echo "Cleared extended attributes on ${APP_NAME}.app"
+fi
