@@ -332,8 +332,8 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             max=1,
             step=0.01,
         )
-        start_input = ui.date_input(label="项目开始日期")
-        end_input = ui.date_input(label="项目结束日期")
+        start_input = ui.date_input(label="项目开始日期（可空，生成时用全局区间）")
+        end_input = ui.date_input(label="项目结束日期（可空，生成时用全局区间）")
         if existing:
             start_input.value = existing.start_date.isoformat()
             end_input.value = existing.end_date.isoformat()
@@ -358,18 +358,11 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             bl = str(bl_input.value or "").strip() or None
             if bl:
                 session.add_business_line(bl)
-            # Dates: use date_input values, fallback to global span if set
+            # Dates: use date_input values; if empty, use placeholder (resolved at generation time)
             sd_str = str(start_input.value).strip() if start_input.value else ""
             ed_str = str(end_input.value).strip() if end_input.value else ""
-            if not sd_str or not ed_str:
-                if session.global_span is not None:
-                    sd_str = session.global_span.start_date.isoformat()
-                    ed_str = session.global_span.end_date.isoformat()
-                else:
-                    ui.notify("请填写项目起止日期或先设定全局区间", type="warning")
-                    return
-            sd = date.fromisoformat(sd_str)
-            ed = date.fromisoformat(ed_str)
+            sd = date.fromisoformat(sd_str) if sd_str else date(2000, 1, 1)
+            ed = date.fromisoformat(ed_str) if ed_str else date(2099, 12, 31)
             selected_jobs = jobs_input.value or []
             if isinstance(selected_jobs, str):
                 selected_jobs = [selected_jobs]
@@ -543,28 +536,31 @@ def _generate(session, progress_label, result_label) -> None:
         assert span is not None
         staff_states = [StaffState.from_changes(s.name, [], span) for s in session.staff]
 
-        # Resolve empty associated_person_ids → all staff
+        # Resolve: empty associated_person_ids → all staff; placeholder dates → global span
         all_staff_ids = [s.name for s in session.staff]
+        PLACEHOLDER_START = date(2000, 1, 1)
+        PLACEHOLDER_END = date(2099, 12, 31)
         projects_to_gen = []
         for p in session.projects:
-            if not p.associated_person_ids:
-                # Create a copy with all staff as associated
-                projects_to_gen.append(
-                    Project(
-                        id=p.id,
-                        name=p.name,
-                        start_date=p.start_date,
-                        end_date=p.end_date,
-                        target_ratio=p.target_ratio,
-                        required_job_types=p.required_job_types,
-                        associated_person_ids=all_staff_ids,
-                        ramp_up_point=p.ramp_up_point,
-                        maintenance_point=p.maintenance_point,
-                        business_line=p.business_line,
-                    )
+            # Replace placeholder dates with global span
+            sd = p.start_date if p.start_date != PLACEHOLDER_START else span.start_date
+            ed = p.end_date if p.end_date != PLACEHOLDER_END else span.end_date
+            # Replace empty associated_person_ids with all staff
+            pids = p.associated_person_ids if p.associated_person_ids else all_staff_ids
+            projects_to_gen.append(
+                Project(
+                    id=p.id,
+                    name=p.name,
+                    start_date=sd,
+                    end_date=ed,
+                    target_ratio=p.target_ratio,
+                    required_job_types=p.required_job_types,
+                    associated_person_ids=pids,
+                    ramp_up_point=p.ramp_up_point,
+                    maintenance_point=p.maintenance_point,
+                    business_line=p.business_line,
                 )
-            else:
-                projects_to_gen.append(p)
+            )
         cache = HolidayCache(_get_cache_dir())
         orch = HolidayOrchestrator(cache=cache)
         years = range(span.start_date.year, span.end_date.year + 1)
