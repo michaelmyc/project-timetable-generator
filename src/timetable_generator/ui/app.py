@@ -72,8 +72,14 @@ def build_ui() -> SessionState:
 
     ui.label("排班打卡时间表生成器").classes("text-h4 q-mb-md")
 
+    # Inject CSS before rendering (ensure sticky works)
+    ui.add_head_html("""<style>
+    .sticky-top { position: sticky !important; top: 0; z-index: 1000; background: white; }
+    .sticky-bottom-bar { position: sticky; bottom: 0; background: white; padding: 10px; z-index: 100; border-top: 1px solid #eee; }
+    </style>""")
+
     # --- Sticky top navigation with tabs ---
-    with ui.header().classes("sticky-top"), ui.tabs() as tabs:
+    with ui.row().classes("sticky-top w-full no-wrap") as _header, ui.tabs() as tabs:
         ui.tab("区间设置")
         ui.tab("员工管理")
         ui.tab("项目管理")
@@ -91,28 +97,6 @@ def build_ui() -> SessionState:
             _build_validate_and_generate(session)
         with ui.tab_panel("结果导出"):
             _build_export(session)
-
-    # Inject CSS for sticky header
-    ui.add_head_html(
-        """
-        <style>
-        .sticky-top {
-            position: sticky !important;
-            top: 0;
-            z-index: 1000;
-            background: white;
-        }
-        .sticky-bottom-bar {
-            position: sticky;
-            bottom: 0;
-            background: white;
-            padding: 10px;
-            z-index: 100;
-            border-top: 1px solid #eee;
-        }
-        </style>
-        """
-    )
 
     return session
 
