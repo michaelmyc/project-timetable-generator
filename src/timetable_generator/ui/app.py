@@ -56,7 +56,6 @@ def build_ui() -> SessionState:
 def _build_global_span(session: SessionState) -> None:
     ui.label("1. 全局生成区间").classes("text-h6")
 
-
     def _on_change(_e=None) -> None:
         start_val = start_picker.value
         end_val = end_picker.value
@@ -195,41 +194,39 @@ def _refresh_staff_table(session, staff_table) -> None:
 
 
 def _import_staff(session, staff_table) -> None:
-    """Import staff from CSV/Excel."""
-    # For MVP, use a file path input dialog
+    """Import staff via file picker (ui.upload)."""
     with ui.dialog() as dialog, ui.card():
         ui.label("导入员工").classes("text-h6")
-        path_input = ui.input(label="文件路径 (CSV 或 Excel)")
-        ui.label("格式: 员工,工种,业务线,入职时间,离职时间").classes("text-caption")
+        ui.label("格式: 员工,工种,业务线,入职时间,离职时间 (CSV 或 Excel)").classes("text-caption")
 
-        def _do_import():
-            path = Path((path_input.value or "").strip())
-            if not path.exists():
-                ui.notify(f"文件不存在: {path}", type="negative")
-                return
+        async def _on_upload(e):
             try:
-                imported = import_staff_csv(path)
+                content = e.content.read()
+                tmp = Path("/tmp/_staff_import.tmp")
+                tmp.write_bytes(content)
+                imported = import_staff_csv(tmp)
                 session.staff.extend(imported)
                 _refresh_staff_table(session, staff_table)
-                ui.notify(f"导入 {len(imported)} 名员工")
+                ui.notify(f"导入 {len(imported)} 名员工", type="positive")
                 dialog.close()
-            except Exception as e:
-                ui.notify(f"导入失败: {e}", type="negative")
+            except Exception as ex:
+                ui.notify(f"导入失败: {ex}", type="negative")
 
-        with ui.row():
-            ui.button("导入", on_click=_do_import)
-            ui.button("取消", on_click=dialog.close)
+        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True)
+        ui.button("取消", on_click=dialog.close)
     dialog.open()
 
 
 def _export_staff(session) -> None:
-    """Export staff to CSV."""
+    """Export staff to CSV via browser download."""
     if not session.staff:
         ui.notify("没有员工可导出", type="warning")
         return
-    path = Path("staff_export.csv")
-    export_staff_csv(session.staff, path)
-    ui.notify(f"已导出: {path.resolve()}")
+    import tempfile
+
+    tmp = Path(tempfile.mktemp(suffix=".csv"))
+    export_staff_csv(session.staff, tmp)
+    ui.download(tmp, filename="staff_export.csv")
 
 
 # --- Step 3: Project Management ---
@@ -365,43 +362,45 @@ def _refresh_project_table(session, project_table) -> None:
 
 
 def _import_projects(session) -> None:
+    """Import projects via file picker (ui.upload)."""
+    if session.global_span is None:
+        ui.notify("请先设定全局区间", type="warning")
+        return
     with ui.dialog() as dialog, ui.card():
         ui.label("导入项目").classes("text-h6")
-        path_input = ui.input(label="文件路径 (CSV 或 Excel)")
         ui.label("格式: 项目标识,项目名称,业务线,投入百分比,项目开始时间,项目结束时间").classes(
             "text-caption"
         )
-        if session.global_span is None:
-            ui.notify("请先设定全局区间", type="warning")
 
-        def _do_import():
-            path = Path((path_input.value or "").strip())
-            if not path.exists():
-                ui.notify(f"文件不存在: {path}", type="negative")
-                return
+        async def _on_upload(e):
             try:
+                content = e.content.read()
+                tmp = Path("/tmp/_project_import.tmp")
+                tmp.write_bytes(content)
                 span = session.global_span
-                imported = import_projects_csv(path, span.start_date, span.end_date)
+                imported = import_projects_csv(tmp, span.start_date, span.end_date)
                 session.projects.extend(imported)
                 _refresh_project_table(session, session._project_table)  # type: ignore[attr-defined]
-                ui.notify(f"导入 {len(imported)} 个项目")
+                ui.notify(f"导入 {len(imported)} 个项目", type="positive")
                 dialog.close()
-            except Exception as e:
-                ui.notify(f"导入失败: {e}", type="negative")
+            except Exception as ex:
+                ui.notify(f"导入失败: {ex}", type="negative")
 
-        with ui.row():
-            ui.button("导入", on_click=_do_import)
-            ui.button("取消", on_click=dialog.close)
+        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True)
+        ui.button("取消", on_click=dialog.close)
     dialog.open()
 
 
 def _export_projects(session) -> None:
+    """Export projects to CSV via browser download."""
     if not session.projects:
         ui.notify("没有项目可导出", type="warning")
         return
-    path = Path("projects_export.csv")
-    export_projects_csv(session.projects, path)
-    ui.notify(f"已导出: {path.resolve()}")
+    import tempfile
+
+    tmp = Path(tempfile.mktemp(suffix=".csv"))
+    export_projects_csv(session.projects, tmp)
+    ui.download(tmp, filename="projects_export.csv")
 
 
 # --- Step 4: Validation ---
@@ -526,15 +525,19 @@ def _build_export(session: SessionState) -> None:
 
 
 def _export_csv(session) -> None:
+    """Export work-hour records to CSV via browser download."""
     if not session.has_result:
         ui.notify("请先生成", type="warning")
         return
-    path = Path("output.csv")
-    export_csv(session.generation_result.records, path)
-    ui.notify(f"CSV 已导出: {path.resolve()}")
+    import tempfile
+
+    tmp = Path(tempfile.mktemp(suffix=".csv"))
+    export_csv(session.generation_result.records, tmp)
+    ui.download(tmp, filename="output.csv")
 
 
 def _export_params(session) -> None:
+    """Export session params to JSON via browser download."""
     if session.global_span is None:
         ui.notify("请先设定区间", type="warning")
         return
@@ -543,9 +546,11 @@ def _export_params(session) -> None:
         projects=session.projects,
         staff=session.staff,
     )
-    path = Path("params.json")
-    export_params(params, path)
-    ui.notify(f"配置已导出: {path.resolve()}")
+    import tempfile
+
+    tmp = Path(tempfile.mktemp(suffix=".json"))
+    export_params(params, tmp)
+    ui.download(tmp, filename="params.json")
 
 
 # --- Algorithm Info ---
