@@ -95,6 +95,7 @@ def _build_staff_management(session: SessionState) -> None:
     staff_table = ui.table(
         columns=[
             {"name": "name", "label": "员工", "field": "name"},
+            {"name": "job_type", "label": "工种", "field": "job_type"},
             {"name": "business_line", "label": "业务线【暂不考虑】", "field": "business_line"},
             {"name": "onboard_date", "label": "入职时间【暂不考虑】", "field": "onboard_date"},
             {"name": "leave_date", "label": "离职时间【暂不考虑】", "field": "leave_date"},
@@ -239,6 +240,8 @@ def _build_project_management(session: SessionState) -> None:
         columns=[
             {"name": "id", "label": "项目标识", "field": "id"},
             {"name": "name", "label": "项目名称", "field": "name"},
+            {"name": "target_ratio", "label": "投入比例", "field": "target_ratio"},
+            {"name": "required_job_types", "label": "所需工种", "field": "required_job_types"},
             {"name": "business_line", "label": "业务线【暂不考虑】", "field": "business_line"},
             {"name": "start_date", "label": "开始时间", "field": "start_date"},
             {"name": "end_date", "label": "结束时间", "field": "end_date"},
@@ -349,8 +352,8 @@ def _refresh_project_table(session, project_table) -> None:
             {
                 "id": p.id,
                 "name": p.name,
-                "business_line": p.business_line or "—",
                 "target_ratio": f"{p.target_ratio:.0%}",
+                "required_job_types": ", ".join(p.required_job_types) if p.required_job_types else "无约束",
                 "start_date": p.start_date.isoformat(),
                 "end_date": p.end_date.isoformat(),
             }
