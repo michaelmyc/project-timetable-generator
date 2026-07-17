@@ -172,6 +172,9 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             )
             if edit_index is not None:
                 session.update_staff(edit_index, staff)
+            else:
+                session.add_staff(staff)
+            _refresh_staff_table(session, staff_table)
             dialog.close()
 
         with ui.row():
@@ -329,28 +332,25 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             pid = pname  # id = name (合并)
             ratio = float(ratio_input.value)
             bl = (bl_input.value or "").strip() or None
-            if session.global_span is None:
-                ui.notify("请先设定全局区间", type="warning")
-                return
-            sd = (
-                date.fromisoformat(str(start_input.value))
-                if start_input.value
-                else session.global_span.start_date
-            )
-            ed = (
-                date.fromisoformat(str(end_input.value))
-                if end_input.value
-                else session.global_span.end_date
-            )
+            # Dates: use date_input values, fallback to global span if set
+            sd_str = str(start_input.value).strip() if start_input.value else ""
+            ed_str = str(end_input.value).strip() if end_input.value else ""
+            if not sd_str or not ed_str:
+                if session.global_span is not None:
+                    sd_str = session.global_span.start_date.isoformat()
+                    ed_str = session.global_span.end_date.isoformat()
+                else:
+                    ui.notify("请填写项目起止日期或先设定全局区间", type="warning")
+                    return
+            sd = date.fromisoformat(sd_str)
+            ed = date.fromisoformat(ed_str)
             selected_jobs = jobs_input.value or []
             if isinstance(selected_jobs, str):
                 selected_jobs = [selected_jobs]
             jobs = [str(j).strip() for j in selected_jobs if str(j).strip()]
             session.add_job_types(jobs)
+            # associated_person_ids: empty = all staff (resolved at generation time)
             staff_ids = session.get_staff_ids()
-            if not staff_ids:
-                ui.notify("请先添加员工", type="warning")
-                return
             project = Project(
                 id=pid,
                 name=pname,
@@ -519,6 +519,28 @@ def _generate(session, progress_label, result_label) -> None:
         assert span is not None
         staff_states = [StaffState.from_changes(s.name, [], span) for s in session.staff]
 
+        # Resolve empty associated_person_ids → all staff
+        all_staff_ids = [s.name for s in session.staff]
+        projects_to_gen = []
+        for p in session.projects:
+            if not p.associated_person_ids:
+                # Create a copy with all staff as associated
+                projects_to_gen.append(
+                    Project(
+                        id=p.id,
+                        name=p.name,
+                        start_date=p.start_date,
+                        end_date=p.end_date,
+                        target_ratio=p.target_ratio,
+                        required_job_types=p.required_job_types,
+                        associated_person_ids=all_staff_ids,
+                        ramp_up_point=p.ramp_up_point,
+                        maintenance_point=p.maintenance_point,
+                        business_line=p.business_line,
+                    )
+                )
+            else:
+                projects_to_gen.append(p)
         cache = HolidayCache(_get_cache_dir())
         orch = HolidayOrchestrator(cache=cache)
         years = range(span.start_date.year, span.end_date.year + 1)
@@ -547,7 +569,7 @@ def _generate(session, progress_label, result_label) -> None:
         session.holiday_fallback = resolver.is_fallback
 
         result = generate_with_retry(
-            projects=session.projects,
+            projects=projects_to_gen,
             staff_states=staff_states,
             holidays=holidays,
             global_span=span,

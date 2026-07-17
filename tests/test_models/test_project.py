@@ -90,17 +90,18 @@ def test_project_empty_id_raises():
         )
 
 
-def test_project_empty_associated_persons_raises():
-    with pytest.raises(ValueError, match="associated_person"):
-        Project(
-            id="p1",
-            name="A",
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 3, 31),
-            target_ratio=0.3,
-            required_job_types=["研发人员"],
-            associated_person_ids=[],
-        )
+def test_project_empty_associated_persons_allowed():
+    """associated_person_ids may be empty — means all staff (resolved at generation)."""
+    p = Project(
+        id="p1",
+        name="A",
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 3, 31),
+        target_ratio=0.3,
+        required_job_types=["研发人员"],
+        associated_person_ids=[],
+    )
+    assert p.associated_person_ids == []
 
 
 def test_project_business_line_default_none():
