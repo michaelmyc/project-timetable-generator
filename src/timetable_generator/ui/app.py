@@ -553,15 +553,19 @@ def _generate(session, progress_label, result_label) -> None:
         assert span is not None
         staff_states = [StaffState.from_changes(s.name, [], span) for s in session.staff]
 
-        # Resolve: empty associated_person_ids → all staff; None dates → global span
+        # Resolve: empty/pending associated_person_ids → all staff; None dates → global span
         all_staff_ids = [s.name for s in session.staff]
         projects_to_gen = []
         for p in session.projects:
+            # Replace empty/pending associated_person_ids with all staff
+            pids = (
+                all_staff_ids
+                if not p.associated_person_ids or p.associated_person_ids == ["__pending__"]
+                else p.associated_person_ids
+            )
             # Replace None dates with global span
             sd = p.start_date if p.start_date is not None else span.start_date
             ed = p.end_date if p.end_date is not None else span.end_date
-            # Replace empty associated_person_ids with all staff
-            pids = p.associated_person_ids if p.associated_person_ids else all_staff_ids
             projects_to_gen.append(
                 Project(
                     id=p.id,
