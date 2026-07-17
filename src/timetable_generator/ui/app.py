@@ -56,10 +56,8 @@ def build_ui() -> SessionState:
 def _build_global_span(session: SessionState) -> None:
     ui.label("1. 全局生成区间").classes("text-h6")
     with ui.row():
-        ui.label("开始日期")
-        start_picker = ui.date()
-        ui.label("结束日期")
-        end_picker = ui.date()
+        start_picker = ui.date_input(label="开始日期")
+        end_picker = ui.date_input(label="结束日期")
         ui.button(
             "设定区间", on_click=lambda: _set_span(session, start_picker, end_picker, span_label)
         )
@@ -273,10 +271,8 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             max=1,
             step=0.01,
         )
-        ui.label("项目开始日期")
-        start_input = ui.date()
-        ui.label("项目结束日期")
-        end_input = ui.date()
+        start_input = ui.date_input(label="项目开始日期")
+        end_input = ui.date_input(label="项目结束日期")
         if existing:
             start_input.value = existing.start_date.isoformat()
             end_input.value = existing.end_date.isoformat()
