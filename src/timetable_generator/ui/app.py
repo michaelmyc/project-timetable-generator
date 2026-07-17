@@ -86,7 +86,7 @@ def build_ui() -> SessionState:
         ui.tab("校验与生成")
         ui.tab("结果导出")
 
-    with ui.tab_panels(tabs, value="区间设置").classes("w-full"):
+    with ui.tab_panels(tabs, value="区间设置").classes("w-full").style("margin-top: 50px"):
         with ui.tab_panel("区间设置"):
             _build_global_span(session)
         with ui.tab_panel("员工管理"):
