@@ -1,13 +1,10 @@
-"""Console script entry point — shared with PyInstaller main.py."""
+"""Console script entry point — shared with main.py (web server mode)."""
 
 import multiprocessing
 
-from nicegui import app, ui
+from nicegui import ui
 
 from timetable_generator.ui.app import build_ui
-
-app.native.window_args["resizable"] = True
-app.native.start_args["debug"] = False
 
 
 @ui.page("/")
@@ -17,12 +14,11 @@ def index() -> None:
 
 
 def main() -> None:
-    """Run the timetable generator UI in native window mode."""
+    """Run the timetable generator UI as a web server."""
     ui.run(
         title="排班打卡时间表生成器",
         reload=False,
         port=8080,
-        native=True,
     )
 
 

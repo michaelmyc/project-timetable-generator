@@ -2,13 +2,9 @@
 
 import multiprocessing
 
-from nicegui import app, ui
+from nicegui import ui
 
 from timetable_generator.ui.app import build_ui
-
-# Native window config must be set before the main guard (AGENTS.md).
-app.native.window_args["resizable"] = True
-app.native.start_args["debug"] = False
 
 
 @ui.page("/")
@@ -18,12 +14,11 @@ def index() -> None:
 
 
 def main() -> None:
-    """Run the timetable generator UI in native window mode."""
+    """Run the timetable generator UI as a web server (browser mode for debugging)."""
     ui.run(
         title="排班打卡时间表生成器",
         reload=False,
         port=8080,
-        native=True,
     )
 
 
