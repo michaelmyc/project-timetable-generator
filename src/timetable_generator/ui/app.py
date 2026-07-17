@@ -172,10 +172,11 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             )
             if edit_index is not None:
                 session.update_staff(edit_index, staff)
-            else:
-                session.add_staff(staff)
-            _refresh_staff_table(session, staff_table)
             dialog.close()
+
+        with ui.row():
+            ui.button("保存", on_click=_save)
+            ui.button("取消", on_click=dialog.close)
 
     dialog.open()
 
