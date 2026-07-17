@@ -186,9 +186,14 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             _refresh_staff_table(session, staff_table)
             dialog.close()
 
+        with ui.row():
+            ui.button("保存", on_click=_save)
+            ui.button("取消", on_click=dialog.close)
+
+    dialog.open()
+
 
 def _on_edit_staff(session, staff_table, row) -> None:
-    """Edit a staff row triggered by the in-row edit button."""
     name = row.get("name", "") if isinstance(row, dict) else ""
     index = next((i for i, s in enumerate(session.staff) if s.name == name), None)
     if index is not None:
@@ -339,7 +344,7 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
                 ui.notify("项目名称不能为空", type="warning")
                 return
             pid = pname  # id = name (合并)
-            ratio = float(ratio_input.value)
+            ratio = float(ratio_input.value) if ratio_input.value is not None else 0.0
             bl = (bl_input.value or "").strip() or None
             # Dates: use date_input values, fallback to global span if set
             sd_str = str(start_input.value).strip() if start_input.value else ""
