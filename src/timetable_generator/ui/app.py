@@ -55,26 +55,26 @@ def build_ui() -> SessionState:
 # --- Step 1: Global Span (calendar) ---
 def _build_global_span(session: SessionState) -> None:
     ui.label("1. 全局生成区间").classes("text-h6")
-    with ui.row():
-        start_picker = ui.date_input(label="开始日期")
-        end_picker = ui.date_input(label="结束日期")
-        ui.button(
-            "设定区间", on_click=lambda: _set_span(session, start_picker, end_picker, span_label)
-        )
     span_label = ui.label("区间未设定")
+
+    def _on_change(_e=None) -> None:
+        start_val = start_picker.value
+        end_val = end_picker.value
+        if start_val and end_val:
+            start = date.fromisoformat(str(start_val))
+            end = date.fromisoformat(str(end_val))
+            session.set_span(start, end)
+            span_label.text = f"区间: {start} → {end}"
+
+    with ui.row():
+        start_picker = ui.date_input(label="开始日期", on_change=_on_change)
+        end_picker = ui.date_input(label="结束日期", on_change=_on_change)
     session._span_label = span_label  # type: ignore[attr-defined]
 
 
 def _set_span(session, start_picker, end_picker, span_label) -> None:
-    start_val = start_picker.value
-    end_val = end_picker.value
-    if not start_val or not end_val:
-        ui.notify("请选择开始和结束日期", type="warning")
-        return
-    start = date.fromisoformat(str(start_val))
-    end = date.fromisoformat(str(end_val))
-    session.set_span(start, end)
-    span_label.text = f"区间: {start} → {end}"
+    """Kept for backward compat — not used by UI anymore."""
+    pass
 
 
 # --- Step 2: Staff Management ---
