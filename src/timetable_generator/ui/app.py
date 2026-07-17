@@ -91,7 +91,7 @@ def _build_staff_management(session: SessionState) -> None:
         ui.button("导入员工", on_click=lambda: _import_staff(session, staff_table))
         ui.button("导出员工", on_click=lambda: _export_staff(session))
 
-    # Staff table with edit/delete
+    # Staff table
     staff_table = ui.table(
         columns=[
             {"name": "name", "label": "员工", "field": "name"},
@@ -104,8 +104,10 @@ def _build_staff_management(session: SessionState) -> None:
         row_key="name",
     )
 
-    # Add/Edit dialog
-    ui.button("添加员工", on_click=lambda: _show_staff_dialog(session, staff_table, None))
+    with ui.row():
+        ui.button("添加员工", on_click=lambda: _show_staff_dialog(session, staff_table, None))
+        ui.button("编辑选中", on_click=lambda: _edit_selected_staff(session, staff_table))
+        ui.button("删除选中", on_click=lambda: _delete_selected_staff(session, staff_table))
 
     session._staff_table = staff_table  # type: ignore[attr-defined]
 
@@ -171,10 +173,33 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             _refresh_staff_table(session, staff_table)
             dialog.close()
 
-        with ui.row():
-            ui.button("保存", on_click=_save)
-            ui.button("取消", on_click=dialog.close)
     dialog.open()
+
+
+def _edit_selected_staff(session, staff_table) -> None:
+    """Edit the first selected staff row."""
+    selected = getattr(staff_table, "selected", []) or []
+    if not selected:
+        ui.notify("请先选择一行", type="warning")
+        return
+    name = selected[0].get("name", "")
+    index = next((i for i, s in enumerate(session.staff) if s.name == name), None)
+    if index is not None:
+        _show_staff_dialog(session, staff_table, index)
+
+
+def _delete_selected_staff(session, staff_table) -> None:
+    """Delete the first selected staff row."""
+    selected = getattr(staff_table, "selected", []) or []
+    if not selected:
+        ui.notify("请先选择一行", type="warning")
+        return
+    name = selected[0].get("name", "")
+    index = next((i for i, s in enumerate(session.staff) if s.name == name), None)
+    if index is not None:
+        session.remove_staff(index)
+        _refresh_staff_table(session, staff_table)
+        ui.notify(f"已删除: {name}")
 
 
 def _refresh_staff_table(session, staff_table) -> None:
@@ -250,7 +275,10 @@ def _build_project_management(session: SessionState) -> None:
         row_key="id",
     )
 
-    ui.button("添加项目", on_click=lambda: _show_project_dialog(session, project_table, None))
+    with ui.row():
+        ui.button("添加项目", on_click=lambda: _show_project_dialog(session, project_table, None))
+        ui.button("编辑选中", on_click=lambda: _edit_selected_project(session, project_table))
+        ui.button("删除选中", on_click=lambda: _delete_selected_project(session, project_table))
 
     session._project_table = project_table  # type: ignore[attr-defined]
 
@@ -343,6 +371,32 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             ui.button("保存", on_click=_save)
             ui.button("取消", on_click=dialog.close)
     dialog.open()
+
+
+def _edit_selected_project(session, project_table) -> None:
+    """Edit the first selected project row."""
+    selected = getattr(project_table, "selected", []) or []
+    if not selected:
+        ui.notify("请先选择一行", type="warning")
+        return
+    pid = selected[0].get("id", "")
+    index = next((i for i, p in enumerate(session.projects) if p.id == pid), None)
+    if index is not None:
+        _show_project_dialog(session, project_table, index)
+
+
+def _delete_selected_project(session, project_table) -> None:
+    """Delete the first selected project row."""
+    selected = getattr(project_table, "selected", []) or []
+    if not selected:
+        ui.notify("请先选择一行", type="warning")
+        return
+    pid = selected[0].get("id", "")
+    index = next((i for i, p in enumerate(session.projects) if p.id == pid), None)
+    if index is not None:
+        session.remove_project(index)
+        _refresh_project_table(session, project_table)
+        ui.notify(f"已删除: {pid}")
 
 
 def _refresh_project_table(session, project_table) -> None:
