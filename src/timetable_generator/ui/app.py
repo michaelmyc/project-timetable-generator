@@ -100,6 +100,7 @@ def _build_staff_management(session: SessionState) -> None:
             {"name": "onboard_date", "label": "入职时间【暂不考虑】", "field": "onboard_date"},
             {"name": "leave_date", "label": "离职时间【暂不考虑】", "field": "leave_date"},
         ],
+        rows=[],
         row_key="name",
         selection="single",
     )
