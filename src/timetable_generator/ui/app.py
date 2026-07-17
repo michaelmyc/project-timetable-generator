@@ -1,13 +1,14 @@
 """NiceGUI UI — build the full MVP interface (overhauled).
 
 Features:
-- Calendar date picker for global span
-- Staff management: add/edit/delete + CSV/Excel import/export
-- Job types: computed from staff, textbox input with bubble chips
-- Project management: add/edit/delete + CSV/Excel import/export
-- Pre-generation validation button
-- Algorithm explanation panel
-- 【暂不考虑】labels for unused fields (business_line, onboard/leave dates)
+- Sticky top navigation with 5 tabs: 区间设置 / 员工管理 / 项目管理 / 校验与生成 / 结果导出
+- Staff management: add/edit/delete + CSV/Excel import/export (sticky bottom action bar)
+- Project management: add/edit/delete + CSV/Excel import/export (sticky bottom action bar)
+- 校验并生成 combined button (validates first, then generates)
+- Algorithm explanation panel placed before the generate button
+- Wider dialogs with full-width form inputs
+- Project target ratio input as percentage (0-100), stored as 0.0-1.0
+- CSV-only export (JSON config export removed)
 - All unused fields preserved in import/export but not editable in MVP
 """
 
@@ -25,7 +26,6 @@ from timetable_generator.export.csv import export_csv
 from timetable_generator.generator.retry import generate_with_retry
 from timetable_generator.holiday.cache import HolidayCache
 from timetable_generator.holiday.orchestrator import HolidayOrchestrator
-from timetable_generator.io.params import SessionParams, export_params
 from timetable_generator.io.project_csv import export_projects_csv, import_projects_csv
 from timetable_generator.io.staff_csv import export_staff_csv, import_staff_csv
 from timetable_generator.models.project import Project
@@ -72,20 +72,58 @@ def build_ui() -> SessionState:
 
     ui.label("排班打卡时间表生成器").classes("text-h4 q-mb-md")
 
-    _build_global_span(session)
-    _build_staff_management(session)
-    _build_project_management(session)
-    _build_validation(session)
-    _build_generate(session)
-    _build_export(session)
-    _build_algorithm_info()
+    # --- Sticky top navigation with tabs ---
+    with ui.header().classes("sticky-top"), ui.tabs() as tabs:
+        ui.tab("区间设置")
+        ui.tab("员工管理")
+        ui.tab("项目管理")
+        ui.tab("校验与生成")
+        ui.tab("结果导出")
+
+    with ui.tab_panels(tabs, value="区间设置").classes("w-full"):
+        with ui.tab_panel("区间设置"):
+            _build_global_span(session)
+        with ui.tab_panel("员工管理"):
+            _build_staff_management(session)
+        with ui.tab_panel("项目管理"):
+            _build_project_management(session)
+        with ui.tab_panel("校验与生成"):
+            _build_validate_and_generate(session)
+        with ui.tab_panel("结果导出"):
+            _build_export(session)
+
+    # Inject CSS for sticky header
+    ui.add_head_html(
+        """
+        <style>
+        .sticky-top {
+            position: sticky !important;
+            top: 0;
+            z-index: 1000;
+            background: white;
+        }
+        .sticky-bottom-bar {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 10px;
+            z-index: 100;
+            border-top: 1px solid #eee;
+        }
+        </style>
+        """
+    )
 
     return session
 
 
-# --- Step 1: Global Span (calendar) ---
+# --- Tab 1: Global Span (calendar) ---
 def _build_global_span(session: SessionState) -> None:
-    ui.label("1. 全局生成区间").classes("text-h6")
+    ui.label("欢迎使用排班打卡时间表生成器").classes("text-h6")
+    ui.label("请在下方设置全局生成区间，然后在其他标签页管理员工、项目并生成工时表。").classes(
+        "text-body1 q-mb-md"
+    )
+    ui.label("全局生成区间").classes("text-subtitle1")
 
     def _on_change(_e=None) -> None:
         start_val = start_picker.value
@@ -104,18 +142,13 @@ def _build_global_span(session: SessionState) -> None:
         session.set_span(start, end)
 
     with ui.row():
-        start_picker = ui.date_input(label="开始日期", on_change=_on_change)
-        end_picker = ui.date_input(label="结束日期", on_change=_on_change)
+        start_picker = ui.date_input(label="开始日期", on_change=_on_change).classes("w-full")
+        end_picker = ui.date_input(label="结束日期", on_change=_on_change).classes("w-full")
 
 
-def _set_span(session, start_picker, end_picker, span_label) -> None:
-    """Kept for backward compat — not used by UI anymore."""
-    pass
-
-
-# --- Step 2: Staff Management ---
+# --- Tab 2: Staff Management ---
 def _build_staff_management(session: SessionState) -> None:
-    ui.label("2. 员工管理").classes("text-h6 q-mt-md")
+    ui.label("员工管理").classes("text-h6")
 
     # Import/Export buttons
     with ui.row():
@@ -135,7 +168,7 @@ def _build_staff_management(session: SessionState) -> None:
         rows=[],
         row_key="name",
         selection="multiple",
-    )
+    ).style("margin-bottom: 80px")
     staff_table.add_slot(
         "body-cell-actions",
         r"""
@@ -146,44 +179,48 @@ def _build_staff_management(session: SessionState) -> None:
     )
     staff_table.on("edit", lambda e: _on_edit_staff(session, staff_table, e.args))
 
-    with ui.row():
+    # Sticky bottom action bar
+    with ui.row().classes("sticky-bottom-bar w-full"):
         ui.button("添加员工", on_click=lambda: _show_staff_dialog(session, staff_table, None))
         ui.button("删除选中", on_click=lambda: _delete_selected_staff(session, staff_table))
+
     session._staff_table = staff_table  # type: ignore[attr-defined]
 
 
 def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
     """Show add/edit staff dialog. edit_index=None for add, index for edit."""
-    with ui.dialog() as dialog, ui.card():
+    with ui.dialog() as dialog, ui.card().style("width: 800px; max-width: 90vw"):
         title = "编辑员工" if edit_index is not None else "添加员工"
         ui.label(title).classes("text-h6")
 
         existing = session.staff[edit_index] if edit_index is not None else None
 
-        name_input = ui.input(label="员工姓名", value=existing.name if existing else "")
+        name_input = ui.input(label="员工姓名", value=existing.name if existing else "").classes(
+            "w-full"
+        )
         job_input = ui.select(
             label="工种",
             options=session.job_types,
             value=existing.job_type if existing else DEFAULT_JOB_TYPE,
             with_input=True,
             new_value_mode="add",
-        )
+        ).classes("w-full")
         bl_input = ui.select(
             label="业务线【暂不考虑】",
             options=session.business_lines,
             value=existing.business_line if existing else None,
             with_input=True,
             new_value_mode="add",
-        )
+        ).classes("w-full")
         # Onboard/leave dates: 暂不考虑 but editable for import/export
         onboard_input = ui.date_input(
             label="入职时间【暂不考虑】",
             value=existing.onboard_date.isoformat() if existing and existing.onboard_date else None,
-        )
+        ).classes("w-full")
         leave_input = ui.date_input(
             label="离职时间【暂不考虑】",
             value=existing.leave_date.isoformat() if existing and existing.leave_date else None,
-        )
+        ).classes("w-full")
 
         def _save():
             name = (name_input.value or "").strip()
@@ -257,7 +294,7 @@ def _refresh_staff_table(session, staff_table) -> None:
 
 def _import_staff(session, staff_table) -> None:
     """Import staff via file picker (ui.upload)."""
-    with ui.dialog() as dialog, ui.card():
+    with ui.dialog() as dialog, ui.card().style("width: 800px; max-width: 90vw"):
         ui.label("导入员工").classes("text-h6")
         ui.label("格式: 员工,工种,业务线,入职时间,离职时间 (CSV 或 Excel)").classes("text-caption")
 
@@ -275,8 +312,9 @@ def _import_staff(session, staff_table) -> None:
             except Exception as ex:
                 ui.notify(f"导入失败: {ex}", type="negative")
 
-        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True)
-        ui.button("取消", on_click=dialog.close)
+        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True).classes("w-full")
+        with ui.row():
+            ui.button("取消", on_click=dialog.close)
     dialog.open()
 
 
@@ -292,9 +330,9 @@ async def _export_staff(session) -> None:
     await _download_file(tmp.read_bytes(), filename="staff_export.csv")
 
 
-# --- Step 3: Project Management ---
+# --- Tab 3: Project Management ---
 def _build_project_management(session: SessionState) -> None:
-    ui.label("3. 项目管理").classes("text-h6 q-mt-md")
+    ui.label("项目管理").classes("text-h6")
 
     with ui.row():
         ui.button("导入项目", on_click=lambda: _import_projects(session))
@@ -312,7 +350,7 @@ def _build_project_management(session: SessionState) -> None:
         rows=[],
         row_key="name",
         selection="multiple",
-    )
+    ).style("margin-bottom: 80px")
     project_table.add_slot(
         "body-cell-actions",
         r"""
@@ -323,7 +361,8 @@ def _build_project_management(session: SessionState) -> None:
     )
     project_table.on("edit", lambda e: _on_edit_project(session, project_table, e.args))
 
-    with ui.row():
+    # Sticky bottom action bar
+    with ui.row().classes("sticky-bottom-bar w-full"):
         ui.button("添加项目", on_click=lambda: _show_project_dialog(session, project_table, None))
         ui.button("删除选中", on_click=lambda: _delete_selected_project(session, project_table))
 
@@ -331,12 +370,14 @@ def _build_project_management(session: SessionState) -> None:
 
 
 def _show_project_dialog(session, project_table, edit_index: int | None) -> None:
-    with ui.dialog() as dialog, ui.card():
+    with ui.dialog() as dialog, ui.card().style("width: 800px; max-width: 90vw"):
         title = "编辑项目" if edit_index is not None else "添加项目"
         ui.label(title).classes("text-h6")
 
         existing = session.projects[edit_index] if edit_index is not None else None
-        pname_input = ui.input(label="项目名称", value=existing.name if existing else "")
+        pname_input = ui.input(label="项目名称", value=existing.name if existing else "").classes(
+            "w-full"
+        )
         # Business line: select from session list, allow new
         bl_input = ui.select(
             label="业务线",
@@ -344,16 +385,18 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             value=existing.business_line if existing else None,
             with_input=True,
             new_value_mode="add",
-        )
+        ).classes("w-full")
         ratio_input = ui.number(
-            label="投入比例 (0-1)",
-            value=existing.target_ratio if existing else 0.3,
+            label="投入比例 (%)",
+            value=existing.target_ratio * 100 if existing else 30,
             min=0,
-            max=1,
-            step=0.01,
+            max=100,
+            step=1,
+        ).classes("w-full")
+        start_input = ui.date_input(label="项目开始日期（可空，生成时用全局区间）").classes(
+            "w-full"
         )
-        start_input = ui.date_input(label="项目开始日期（可空，生成时用全局区间）")
-        end_input = ui.date_input(label="项目结束日期（可空，生成时用全局区间）")
+        end_input = ui.date_input(label="项目结束日期（可空，生成时用全局区间）").classes("w-full")
         if existing:
             start_input.value = existing.start_date.isoformat()
             end_input.value = existing.end_date.isoformat()
@@ -366,7 +409,7 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             multiple=True,
             with_input=True,
             new_value_mode="add",
-        )
+        ).classes("w-full")
 
         def _save():
             pname = (pname_input.value or "").strip()
@@ -374,7 +417,7 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
                 ui.notify("项目名称不能为空", type="warning")
                 return
             pid = pname  # id = name (合并)
-            ratio = float(ratio_input.value) if ratio_input.value is not None else 0.0
+            ratio = float(ratio_input.value) / 100 if ratio_input.value is not None else 0.0
             bl = str(bl_input.value or "").strip() or None
             if bl:
                 session.add_business_line(bl)
@@ -453,7 +496,7 @@ def _refresh_project_table(session, project_table) -> None:
 
 def _import_projects(session) -> None:
     """Import projects via file picker (ui.upload)."""
-    with ui.dialog() as dialog, ui.card():
+    with ui.dialog() as dialog, ui.card().style("width: 800px; max-width: 90vw"):
         ui.label("导入项目").classes("text-h6")
         ui.label("格式: 项目名称,业务线,投入百分比,项目开始时间,项目结束时间").classes(
             "text-caption"
@@ -475,8 +518,9 @@ def _import_projects(session) -> None:
             except Exception as ex:
                 ui.notify(f"导入失败: {ex}", type="negative")
 
-        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True)
-        ui.button("取消", on_click=dialog.close)
+        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True).classes("w-full")
+        with ui.row():
+            ui.button("取消", on_click=dialog.close)
     dialog.open()
 
 
@@ -492,15 +536,35 @@ async def _export_projects(session) -> None:
     await _download_file(tmp.read_bytes(), filename="projects_export.csv")
 
 
-# --- Step 4: Validation ---
-def _build_validation(session: SessionState) -> None:
-    ui.label("4. 校验").classes("text-h6 q-mt-md")
-    ui.button("整体校验", on_click=lambda: _validate(session, validation_label))
-    validation_label = ui.label("")
-    session._validation_label = validation_label  # type: ignore[attr-defined]
+# --- Tab 4: Validate & Generate ---
+def _build_validate_and_generate(session: SessionState) -> None:
+    ui.label("校验与生成").classes("text-h6")
+
+    # Algorithm info BEFORE the generate button
+    _build_algorithm_info()
+
+    ui.button(
+        "校验并生成", on_click=lambda: _validate_and_generate(session, progress_label, result_label)
+    )
+    progress_label = ui.label("")
+    result_label = ui.label("")
+    session._progress_label = progress_label  # type: ignore[attr-defined]
+    session._result_label = result_label  # type: ignore[attr-defined]
+    session._validation_label = result_label  # type: ignore[attr-defined]
 
 
-def _validate(session, validation_label) -> None:
+async def _validate_and_generate(session, progress_label, result_label) -> None:
+    """Validate first; if passed, generate; otherwise show issues."""
+    issues = _collect_validation_issues(session)
+    if issues:
+        result_label.text = "\n".join(issues)
+        ui.notify(f"发现 {len(issues)} 个问题，请先修复", type="warning")
+        return
+    result_label.text = "✅ 校验通过，开始生成..."
+    await _generate(session, progress_label, result_label)
+
+
+def _collect_validation_issues(session) -> list[str]:
     issues: list[str] = []
 
     if session.global_span is None:
@@ -524,25 +588,10 @@ def _validate(session, validation_label) -> None:
     if unmatched:
         issues.append(f"⚠️ 项目业务线无对应员工: {unmatched}（【暂不考虑】，不影响生成）")
 
-    if not issues:
-        validation_label.text = "✅ 校验通过，可以生成"
-        ui.notify("校验通过", type="positive")
-    else:
-        validation_label.text = "\n".join(issues)
-        ui.notify(f"发现 {len(issues)} 个问题", type="warning")
+    return issues
 
 
-# --- Step 5: Generate ---
-def _build_generate(session: SessionState) -> None:
-    ui.label("5. 生成").classes("text-h6 q-mt-md")
-    ui.button("生成工时表", on_click=lambda: _generate(session, progress_label, result_label))
-    progress_label = ui.label("")
-    result_label = ui.label("")
-    session._progress_label = progress_label  # type: ignore[attr-defined]
-    session._result_label = result_label  # type: ignore[attr-defined]
-
-
-def _generate(session, progress_label, result_label) -> None:
+async def _generate(session, progress_label, result_label) -> None:
     if not session.can_generate:
         ui.notify("请先设定区间、添加员工和项目", type="warning")
         return
@@ -633,11 +682,10 @@ def _generate(session, progress_label, result_label) -> None:
         ui.notify(f"生成失败: {e}", type="negative")
 
 
-# --- Step 6: Export ---
+# --- Tab 5: Export (CSV only) ---
 def _build_export(session: SessionState) -> None:
-    ui.label("6. 导出").classes("text-h6 q-mt-md")
+    ui.label("结果导出").classes("text-h6")
     ui.button("导出 CSV (工时记录)", on_click=lambda: _export_csv(session))
-    ui.button("导出配置 (JSON)", on_click=lambda: _export_params(session))
 
 
 async def _export_csv(session) -> None:
@@ -650,23 +698,6 @@ async def _export_csv(session) -> None:
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_csv(session.generation_result.records, tmp)
     await _download_file(tmp.read_bytes(), filename="output.csv")
-
-
-async def _export_params(session) -> None:
-    """Export session params to JSON via browser download."""
-    if session.global_span is None:
-        ui.notify("请先设定区间", type="warning")
-        return
-    params = SessionParams(
-        global_span=session.global_span,
-        projects=session.projects,
-        staff=session.staff,
-    )
-    import tempfile
-
-    tmp = Path(tempfile.mktemp(suffix=".json"))
-    export_params(params, tmp)
-    await _download_file(tmp.read_bytes(), filename="params.json")
 
 
 # --- Algorithm Info ---

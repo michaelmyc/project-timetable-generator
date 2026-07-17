@@ -8,9 +8,9 @@ async def test_page_loads(user: user_simulation):
     await user.should_see("排班打卡时间表生成器")
 
 
-async def test_page_has_global_span_calendar(user: user_simulation):
+async def test_page_has_global_span_tab(user: user_simulation):
     await user.open("/")
-    await user.should_see("全局生成区间")
+    await user.should_see("区间设置")
 
 
 async def test_page_has_staff_management(user: user_simulation):
@@ -25,19 +25,14 @@ async def test_page_has_project_management(user: user_simulation):
     await user.should_see("添加项目")
 
 
-async def test_page_has_validation_button(user: user_simulation):
+async def test_page_has_validate_and_generate_button(user: user_simulation):
     await user.open("/")
-    await user.should_see("整体校验")
+    await user.should_see("校验与生成")
 
 
-async def test_page_has_generate_button(user: user_simulation):
+async def test_page_has_export_tab(user: user_simulation):
     await user.open("/")
-    await user.should_see("生成工时表")
-
-
-async def test_page_has_export_buttons(user: user_simulation):
-    await user.open("/")
-    await user.should_see("导出 CSV")
+    await user.should_see("结果导出")
 
 
 async def test_page_has_algorithm_info(user: user_simulation):
