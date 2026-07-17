@@ -35,6 +35,36 @@ from timetable_generator.ui.session import SessionState
 RATIO_TOLERANCE = 0.08
 
 
+def _download_file(data: bytes, filename: str) -> None:
+    """Download file: native mode uses pywebview save dialog, web mode uses ui.download."""
+    from nicegui import app
+
+    if app.native.is_enabled:
+        # Native/webview mode: use pywebview save dialog
+        import webview
+
+        window = webview.active_window()
+        if window:
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=filename,
+                file_types=("CSV files (*.csv)", "JSON files (*.json)", "All files (*.*)"),
+            )
+            if result:
+                save_path = result if isinstance(result, str) else result[0]
+                Path(save_path).write_bytes(data)
+                ui.notify(f"已保存: {save_path}", type="positive")
+            else:
+                ui.notify("已取消保存", type="warning")
+        else:
+            # Fallback: write to cwd
+            Path(filename).write_bytes(data)
+            ui.notify(f"已保存: {Path(filename).resolve()}", type="positive")
+    else:
+        # Web server mode: trigger browser download
+        ui.download(data, filename=filename)
+
+
 def build_ui() -> SessionState:
     """Build the UI and return the session state for testing."""
     session = SessionState()
@@ -268,7 +298,7 @@ def _export_staff(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_staff_csv(session.staff, tmp)
-    ui.download(tmp.read_bytes(), filename="staff_export.csv")
+    _download_file(tmp.read_bytes(), filename="staff_export.csv")
 
 
 # --- Step 3: Project Management ---
@@ -468,7 +498,7 @@ def _export_projects(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_projects_csv(session.projects, tmp)
-    ui.download(tmp.read_bytes(), filename="projects_export.csv")
+    _download_file(tmp.read_bytes(), filename="projects_export.csv")
 
 
 # --- Step 4: Validation ---
@@ -624,7 +654,7 @@ def _export_csv(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".csv"))
     export_csv(session.generation_result.records, tmp)
-    ui.download(tmp.read_bytes(), filename="output.csv")
+    _download_file(tmp.read_bytes(), filename="output.csv")
 
 
 def _export_params(session) -> None:
@@ -641,7 +671,7 @@ def _export_params(session) -> None:
 
     tmp = Path(tempfile.mktemp(suffix=".json"))
     export_params(params, tmp)
-    ui.download(tmp.read_bytes(), filename="params.json")
+    _download_file(tmp.read_bytes(), filename="params.json")
 
 
 # --- Algorithm Info ---
