@@ -71,6 +71,20 @@ class InfeasibleProjectError(ValueError):
         self.local_capacity = local_capacity
 
 
+class OvercommitError(ValueError):
+    """Raised when a person is overcommitted on one or more days (Σ ratio > 1.0)."""
+
+    def __init__(self, person_id: str, day: date, total_ratio: float, projects: list[str]) -> None:
+        super().__init__(
+            f"人员 {person_id} 在 {day} 被过度分配：关联项目 {projects} 的 ratio 之和 = "
+            f"{total_ratio:.0%}，超过 100%。请降低部分项目的 target_ratio 或增加关联员工。"
+        )
+        self.person_id = person_id
+        self.day = day
+        self.total_ratio = total_ratio
+        self.projects = projects
+
+
 def _overlap_days(state: StaffState, project: Project, workdays: list[date]) -> list[date]:
     return [
         wd
@@ -148,6 +162,20 @@ def plan(
             raise InfeasibleProjectError(p.id, quota, local_cap)
         result.quotas[p.id] = quota
         result.local_capacities[p.id] = local_cap
+
+    # Person-day overcommit check: each person's daily Σratio must be ≤ 1.0.
+    for s in staff_states:
+        for wd in workdays:
+            if not s.is_active_on(wd):
+                continue
+            covering = [
+                p
+                for p in projects
+                if s.person_id in p.associated_person_ids and p.start_date <= wd <= p.end_date
+            ]
+            total_ratio = sum(p.target_ratio for p in covering)
+            if total_ratio > 1.0 + 1e-9:
+                raise OvercommitError(s.person_id, wd, total_ratio, [p.id for p in covering])
 
     # Process projects (order only affects int-rounding distribution, not
     # structural allocation — every person gets their overlap-proportional share).

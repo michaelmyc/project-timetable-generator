@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from timetable_generator.generator.capacity import compute_project_local_capacity, compute_workdays
+from timetable_generator.generator.planner import OvercommitError
 from timetable_generator.generator.retry import generate_with_retry
 from timetable_generator.generator.validator import validate
 from timetable_generator.models.project import Project
@@ -295,6 +296,19 @@ def run_one_case(inp: StressInput) -> CaseResult:
     try:
         result = generate_with_retry(inp.projects, states, inp.holidays, inp.global_span)
         records = result.records
+    except OvercommitError:
+        # Configuration problem (person overcommitted), not an algorithm failure.
+        return CaseResult(
+            seed=inp.seed,
+            success=True,  # don't count as algorithm failure
+            infeasible=True,
+            violations_count=0,
+            ratio_errors=[],
+            gap_hours={},
+            full_load_ratio=0.0,
+            elapsed_s=time.perf_counter() - t0,
+            total_records=0,
+        )
     except Exception as e:
         return CaseResult(
             seed=inp.seed,

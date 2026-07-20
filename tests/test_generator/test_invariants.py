@@ -7,11 +7,15 @@ project span. These catch regressions from algorithm changes.
 
 from __future__ import annotations
 
+import contextlib
 import random
 from collections import defaultdict
 from datetime import date
 
+import pytest
+
 from timetable_generator.generator.greedy import generate
+from timetable_generator.generator.planner import OvercommitError
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_info import StaffInfo
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
@@ -89,21 +93,17 @@ def _test_invariants(seed: int) -> None:
 def test_invariants_20_random_inputs():
     """Run 20 random inputs, verify all invariants hold."""
     for seed in range(20):
-        _test_invariants(seed)
+        with contextlib.suppress(OvercommitError):
+            _test_invariants(seed)
 
 
 def test_invariant_no_overselling_beyond_daily_capacity():
-    """Explicitly: no person-day exceeds 8h, even with many projects sharing a person."""
+    """3 projects each 50% on same person → OvercommitError (config problem)."""
     span = GlobalSpan(date(2026, 3, 2), date(2026, 3, 13))
     states = [StaffState.from_info(StaffInfo(name="u1"), span)]
-    # 3 projects all wanting u1 at 50% — daily total must still be ≤ 8h.
     projects = [
         Project(f"p{i}", f"P{i}", date(2026, 3, 2), date(2026, 3, 13), 0.5, ["研发人员"], ["u1"])
         for i in range(3)
     ]
-    records = generate(projects, states, set(), span)
-    by_day: dict[date, int] = defaultdict(int)
-    for r in records:
-        by_day[r.date] += r.hours
-    for d, total in by_day.items():
-        assert total <= 8, f"{d}: {total}h > 8h (3 projects overselling u1)"
+    with pytest.raises(OvercommitError):
+        generate(projects, states, set(), span)

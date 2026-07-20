@@ -3,7 +3,8 @@
 from datetime import date
 
 from timetable_generator.export.csv import export_csv
-from timetable_generator.generator.retry import GenerationError, generate_with_retry
+from timetable_generator.generator.planner import OvercommitError
+from timetable_generator.generator.retry import generate_with_retry
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
 
@@ -134,7 +135,7 @@ def test_full_m1_conflict_scenario():
         Project("p1", "A", date(2026, 3, 2), date(2026, 3, 6), 0.7, ["研发人员"], ["u1"]),
         Project("p2", "B", date(2026, 3, 2), date(2026, 3, 6), 0.7, ["研发人员"], ["u1"]),
     ]
-    with pytest.raises(GenerationError):
+    with pytest.raises(OvercommitError):
         generate_with_retry(
             projects=projects,
             staff_states=staff,
