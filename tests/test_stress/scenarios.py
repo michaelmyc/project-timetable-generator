@@ -126,5 +126,64 @@ SCENARIOS: list[StressConfig] = [
         ci_cases=30,
         full_cases=100,
     ),
+    StressConfig(
+        name="resource_tight",
+        description="资源紧张 — 人-日overcommit但项目Σratio≤1.0",
+        staff_count_range=(5, 8),
+        project_count_range=(4, 8),
+        span_days_range=(30, 60),
+        overlap_tightness=0.0,  # 项目区间几乎完全重叠
+        ratio_range=(0.1, 0.25),
+        churn_rate=0.0,
+        pool_size_range=(4, 6),  # 大池子：每项目关联大部分人
+        ci_cases=50,
+        full_cases=200,
+    ),
+    StressConfig(
+        name="staggered_overlap",
+        description="项目区间部分重叠 — 测重叠区分配质量",
+        staff_count_range=(8, 15),
+        project_count_range=(3, 6),
+        span_days_range=(90, 180),
+        overlap_tightness=0.5,  # 中等重叠：项目区间部分交错
+        ratio_range=(0.1, 0.3),
+        churn_rate=0.0,
+        pool_size_range=(4, 8),  # 大池子：多项目共享同一批人，产生瓶颈资源
+        ci_cases=50,
+        full_cases=200,
+    ),
+    StressConfig(
+        name="asymmetric_pool",
+        description="关联员工不对称 — 瓶颈资源分配",
+        staff_count_range=(8, 15),
+        project_count_range=(4, 8),
+        span_days_range=(60, 120),
+        overlap_tightness=0.2,  # 项目区间高度重叠
+        ratio_range=(0.08, 0.2),
+        churn_rate=0.0,
+        pool_size_range=(2, 4),  # 小池子：不同项目关联不同子集，产生瓶颈
+        ci_cases=50,
+        full_cases=200,
+    ),
+    StressConfig(
+        name="midterm_leave",
+        description="员工中途离职 — 项目缺人的连锁影响",
+        staff_count_range=(8, 15),
+        project_count_range=(3, 6),
+        span_days_range=(90, 180),
+        overlap_tightness=0.2,
+        ratio_range=(0.1, 0.25),
+        churn_rate=0.6,  # 高离职率：大量员工中途入职/离职
+        pool_size_range=(3, 6),
+        ci_cases=50,
+        full_cases=200,
+    ),
 ]
-CI_SCENARIO_NAMES = {"baseline", "tight_overlap", "realistic"}
+CI_SCENARIO_NAMES = {
+    "baseline",
+    "tight_overlap",
+    "realistic",
+    "staggered_overlap",
+    "asymmetric_pool",
+    "midterm_leave",
+}

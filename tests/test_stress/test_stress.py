@@ -65,6 +65,50 @@ def test_realistic(write_report) -> None:
     _assert_gates(report, is_large=True)
 
 
+@pytest.mark.stress
+def test_resource_tight(write_report) -> None:
+    """Resource tight — person-day overcommit but project Σratio ≤ 1.0."""
+    from tests.test_stress.conftest import get_scenario
+
+    cfg = get_scenario("resource_tight")
+    report = run_stress(cfg, _case_count(cfg, "--full" in sys.argv))
+    write_report(report, "resource_tight.json")
+    _assert_gates(report, is_large=False)
+
+
+@pytest.mark.stress
+def test_staggered_overlap(write_report) -> None:
+    """Staggered overlap — partial project interval overlap, tests overlap-zone allocation."""
+    from tests.test_stress.conftest import get_scenario
+
+    cfg = get_scenario("staggered_overlap")
+    report = run_stress(cfg, _case_count(cfg, "--full" in sys.argv))
+    write_report(report, "staggered_overlap.json")
+    _assert_gates(report, is_large=False)
+
+
+@pytest.mark.stress
+def test_asymmetric_pool(write_report) -> None:
+    """Asymmetric pool — bottleneck resources shared across projects."""
+    from tests.test_stress.conftest import get_scenario
+
+    cfg = get_scenario("asymmetric_pool")
+    report = run_stress(cfg, _case_count(cfg, "--full" in sys.argv))
+    write_report(report, "asymmetric_pool.json")
+    _assert_gates(report, is_large=False)
+
+
+@pytest.mark.stress
+def test_midterm_leave(write_report) -> None:
+    """Midterm leave — staff leaving mid-project causes resource gaps."""
+    from tests.test_stress.conftest import get_scenario
+
+    cfg = get_scenario("midterm_leave")
+    report = run_stress(cfg, _case_count(cfg, "--full" in sys.argv))
+    write_report(report, "midterm_leave.json")
+    _assert_gates(report, is_large=False)
+
+
 def _assert_gates(report, is_large: bool) -> None:
     """Assert quality gates. Print summary on failure for diagnosis."""
     cfg = report.config
