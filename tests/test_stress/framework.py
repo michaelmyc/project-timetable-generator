@@ -173,20 +173,26 @@ def _gen_projects(
     config: StressConfig,
     workdays: list[date],
 ) -> list[Project]:
-    """Generate ``count`` projects, guaranteeing physical feasibility by construction.
+    """Generate projects with Σratio ≤ 1.0 by construction (budget method).
 
-    Method B: for each project, pick associated persons + project interval, compute
-    local capacity, then sample target_ratio capped so quota <= local_capacity * 0.95
-    (leave 5% headroom to avoid boundary infeasibility).
+    Each project gets a ratio drawn from [ratio_min, min(ratio_max, remaining)].
+    If remaining budget can't fit a meaningful ratio, stop generating. No
+    post-hoc ratio reduction — every generated project has its original ratio.
     """
     projects: list[Project] = []
     span_days = (span.end_date - span.start_date).days + 1
     staff_ids = [s.name for s in staff]
-    # All staff share the single job type in MVP; pick from config.job_types.
     job_type = config.job_types[0]
+    ratio_min, ratio_max = config.ratio_range
+    remaining_budget = 1.0  # total ratio budget across all projects
+    states = [StaffState.from_info(s, span) for s in staff]
 
     for i in range(count):
-        # Project interval: width depends on overlap_tightness (tight = shorter, less overlap)
+        # Stop if not enough budget for a meaningful project.
+        if remaining_budget < ratio_min:
+            break
+
+        # Project interval
         min_width = max(2, int(span_days * (1 - config.overlap_tightness) * 0.3))
         max_width = max(min_width + 1, int(span_days * (1 - config.overlap_tightness * 0.5)))
         width = rng.randint(min_width, max_width)
@@ -200,9 +206,7 @@ def _gen_projects(
         pool_size = min(len(staff_ids), rng.randint(pool_min, pool_max))
         associated = rng.sample(staff_ids, pool_size) if pool_size > 0 else []
 
-        # Build a temporary StaffState list to compute local capacity
-        states = [StaffState.from_info(s, span) for s in staff]
-        # Temp project to measure local capacity
+        # Local capacity check
         probe = Project(
             id=f"probe_{i}",
             name=f"probe_{i}",
@@ -214,45 +218,27 @@ def _gen_projects(
         )
         local_cap = compute_project_local_capacity(probe, states, workdays)
         if local_cap <= 0:
-            # No overlap at all; use a trivial 0-ratio project.
-            projects.append(
-                Project(
-                    id=f"p{i + 1}",
-                    name=f"P{i + 1}",
-                    start_date=p_start,
-                    end_date=p_end,
-                    target_ratio=0.0,
-                    required_job_types=[job_type],
-                    associated_person_ids=associated,
-                )
-            )
+            # No overlap; skip this project (don't waste budget on it).
             continue
-        # Cap ratio so quota <= 0.95 * local_cap (feasibility headroom)
-        ratio_max = min(config.ratio_range[1], 0.95)
-        ratio_min = config.ratio_range[0]
-        target_ratio = rng.uniform(ratio_min, ratio_max)
 
-        # --- Project total ratio guard ---
-        # Ensure sum of all projects' target_ratio stays ≤ 1.0 (user config
-        # feasibility). Person-day overcommit is allowed — the algorithm
-        # distributes 8h proportionally when one person is on many projects.
-        existing_total = sum(p.target_ratio for p in projects)
-        # Cap so existing + this project's ratio ≤ 1.0
-        room = 1.0 - existing_total
-        if room < target_ratio:
-            target_ratio = max(0.0, room)
-        target_ratio = max(0.0, min(target_ratio, ratio_max))
+        # Assign ratio from remaining budget.
+        effective_max = min(ratio_max, remaining_budget, 0.95)
+        target_ratio = rng.uniform(ratio_min, effective_max)
+        target_ratio = round(target_ratio, 3)
+        remaining_budget -= target_ratio
+
         projects.append(
             Project(
-                id=f"p{i + 1}",
-                name=f"P{i + 1}",
+                id=f"p{len(projects) + 1}",
+                name=f"P{len(projects) + 1}",
                 start_date=p_start,
                 end_date=p_end,
-                target_ratio=round(target_ratio, 3),
+                target_ratio=target_ratio,
                 required_job_types=[job_type],
                 associated_person_ids=associated,
             )
         )
+
     return projects
 
 
