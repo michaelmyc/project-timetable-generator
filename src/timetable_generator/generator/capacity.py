@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from timetable_generator.models.project import Project
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
 
 FULL_DAY_HOURS = 8
@@ -56,3 +57,25 @@ def compute_target_hours(capacity: int, ratio: float) -> int:
     Rounds down to nearest integer hour.
     """
     return int(capacity * ratio)
+
+
+def compute_project_local_capacity(
+    project: Project,
+    staff_states: list[StaffState],
+    workdays: list[date],
+) -> int:
+    """Total available work hours for a project's associated staff within the project span.
+
+    = Σ(each associated staff's workdays in [project.start, project.end] where active) × 8h.
+    Used as the denominator for project ratio and the physical-feasibility ceiling.
+    """
+    by_id = {s.person_id: s for s in staff_states}
+    total = 0
+    for pid in project.associated_person_ids:
+        state = by_id.get(pid)
+        if state is None:
+            continue
+        for wd in workdays:
+            if project.start_date <= wd <= project.end_date and state.is_active_on(wd):
+                total += FULL_DAY_HOURS
+    return total

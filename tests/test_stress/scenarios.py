@@ -1,0 +1,119 @@
+"""Stress test scenarios — 8 parameterized configs covering difficulty dimensions.
+
+Each config targets a specific failure mode of the greedy algorithm. CI runs a
+lightweight subset (ci_cases); the full matrix (full_cases) runs manually.
+"""
+
+from __future__ import annotations
+
+from tests.test_stress.framework import StressConfig
+
+SCENARIOS: list[StressConfig] = [
+    StressConfig(
+        name="baseline",
+        description="宽松基线 — 资源充足，验基本稳定性",
+        staff_count_range=(5, 10),
+        project_count_range=(2, 4),
+        span_days_range=(30, 60),
+        overlap_tightness=0.2,
+        ratio_range=(0.3, 0.7),
+        churn_rate=0.0,
+        pool_size_range=(3, 6),
+        ci_cases=50,
+        full_cases=300,
+    ),
+    StressConfig(
+        name="tight_overlap",
+        description="窄重合 — 项目区间与员工在职重合稀缺",
+        staff_count_range=(5, 10),
+        project_count_range=(3, 6),
+        span_days_range=(30, 60),
+        overlap_tightness=0.8,
+        ratio_range=(0.3, 0.7),
+        churn_rate=0.3,
+        pool_size_range=(3, 6),
+        ci_cases=50,
+        full_cases=300,
+    ),
+    StressConfig(
+        name="high_ratio",
+        description="高比例 — 资源紧张，接近物理上限",
+        staff_count_range=(5, 10),
+        project_count_range=(2, 4),
+        span_days_range=(30, 60),
+        overlap_tightness=0.3,
+        ratio_range=(0.7, 0.95),
+        churn_rate=0.1,
+        pool_size_range=(3, 6),
+        ci_cases=50,
+        full_cases=300,
+    ),
+    StressConfig(
+        name="small_pool",
+        description="小关联池 — 每项目只关联 1-2 人，无冗余",
+        staff_count_range=(3, 5),
+        project_count_range=(3, 6),
+        span_days_range=(30, 60),
+        overlap_tightness=0.3,
+        ratio_range=(0.3, 0.7),
+        churn_rate=0.1,
+        pool_size_range=(1, 2),
+        ci_cases=50,
+        full_cases=300,
+    ),
+    StressConfig(
+        name="churn",
+        description="人事流动 — 大量员工在职区间短且错位",
+        staff_count_range=(10, 20),
+        project_count_range=(3, 6),
+        span_days_range=(120, 180),
+        overlap_tightness=0.4,
+        ratio_range=(0.3, 0.7),
+        churn_rate=0.7,
+        pool_size_range=(3, 6),
+        ci_cases=30,
+        full_cases=200,
+    ),
+    StressConfig(
+        name="cross_project",
+        description="高交叉 — 同一批员工被多项目共享",
+        staff_count_range=(5, 10),
+        project_count_range=(5, 10),
+        span_days_range=(30, 60),
+        overlap_tightness=0.2,
+        ratio_range=(0.3, 0.7),
+        churn_rate=0.1,
+        pool_size_range=(4, 8),
+        ci_cases=50,
+        full_cases=300,
+    ),
+    StressConfig(
+        name="large",
+        description="大规模 — 验算法不崩不超时",
+        staff_count_range=(30, 50),
+        project_count_range=(10, 20),
+        span_days_range=(180, 365),
+        overlap_tightness=0.3,
+        ratio_range=(0.3, 0.6),
+        churn_rate=0.2,
+        pool_size_range=(3, 6),
+        ci_cases=10,
+        full_cases=50,
+    ),
+    StressConfig(
+        name="boundary",
+        description="接近物理上限 — 配额接近本地容量",
+        staff_count_range=(5, 10),
+        project_count_range=(2, 4),
+        span_days_range=(30, 60),
+        overlap_tightness=0.3,
+        ratio_range=(0.85, 0.95),
+        churn_rate=0.1,
+        pool_size_range=(3, 6),
+        ci_cases=30,
+        full_cases=200,
+    ),
+]
+
+# CI subset: lightweight scenarios for default pytest runs.
+CI_SCENARIO_NAMES = {"baseline", "tight_overlap"}

@@ -36,6 +36,9 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 main_file = "main.py"
+markers = [
+    "stress: stress tests — randomized quality evaluation (run subset in CI, full matrix manually)",
+]
 
 [tool.ruff]
 line-length = 100

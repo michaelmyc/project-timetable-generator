@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 from timetable_generator.models.staff_change import StaffChangeRecord
+from timetable_generator.models.staff_info import StaffInfo
 
 DEFAULT_JOB_TYPE = "研发人员"
 
@@ -101,6 +102,42 @@ class StaffState:
             job_type=onboard.job_type or DEFAULT_JOB_TYPE,
             business_line=current_bl,
             business_line_segments=segments,
+            _end_is_leave=end_is_leave,
+        )
+
+    @classmethod
+    def from_info(cls, info: StaffInfo, global_span: GlobalSpan) -> StaffState:
+        """Build StaffState from a StaffInfo profile (MVP path, no change records).
+
+        - onboard_date None → defaults to global_span.start (inclusive).
+        - leave_date None → defaults to global_span.end (inclusive), _end_is_leave=False.
+        - leave_date present → treated as *last active day* (inclusive); StaffState
+          uses exclusive end semantics internally, so end = leave_date + 1 day.
+        - Clamps to global_span. A staff fully outside the span gets a degenerate
+          active_span (end <= start) so is_active_on returns False for any span day.
+        - If leave_date is beyond span end, it's clamped and _end_is_leave set False
+          (the staff is effectively active through the whole span).
+        """
+        start = info.onboard_date or global_span.start_date
+        if info.leave_date is not None:
+            raw_end = info.leave_date + timedelta(days=1)
+            end_is_leave = True
+        else:
+            raw_end = global_span.end_date + timedelta(days=1)
+            end_is_leave = False
+        # Clamp to span.
+        start = max(start, global_span.start_date)
+        end = min(raw_end, global_span.end_date + timedelta(days=1))
+        # If the leave boundary was clamped (was beyond span), it's no longer a real
+        # leave within this span — treat as inclusive span end.
+        if end_is_leave and raw_end > global_span.end_date + timedelta(days=1):
+            end_is_leave = False
+        return cls(
+            person_id=info.id,
+            active_span=(start, end),
+            job_type=info.job_type,
+            business_line=info.business_line,
+            business_line_segments=[(start, info.business_line)],
             _end_is_leave=end_is_leave,
         )
 

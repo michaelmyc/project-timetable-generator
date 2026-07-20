@@ -168,8 +168,8 @@ def _build_staff_management(session: SessionState) -> None:
             {"name": "name", "label": "员工", "field": "name"},
             {"name": "job_type", "label": "工种", "field": "job_type"},
             {"name": "business_line", "label": "业务线【暂不考虑】", "field": "business_line"},
-            {"name": "onboard_date", "label": "入职时间【暂不考虑】", "field": "onboard_date"},
-            {"name": "leave_date", "label": "离职时间【暂不考虑】", "field": "leave_date"},
+            {"name": "onboard_date", "label": "入职时间", "field": "onboard_date"},
+            {"name": "leave_date", "label": "离职时间", "field": "leave_date"},
             {"name": "actions", "label": "操作", "field": "actions"},
         ],
         rows=[],
@@ -214,13 +214,13 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             with_input=True,
             new_value_mode="add",
         ).classes("w-full")
-        # Onboard/leave dates: 暂不考虑 but editable for import/export
+        # Onboard/leave dates: affect active span and capacity
         onboard_input = ui.date_input(
-            label="入职时间【暂不考虑】",
+            label="入职时间",
             value=existing.onboard_date.isoformat() if existing and existing.onboard_date else None,
         ).classes("w-full")
         leave_input = ui.date_input(
-            label="离职时间【暂不考虑】",
+            label="离职时间",
             value=existing.leave_date.isoformat() if existing and existing.leave_date else None,
         ).classes("w-full")
 
@@ -606,7 +606,7 @@ async def _generate(session, progress_label, result_label) -> None:
     try:
         span = session.global_span
         assert span is not None
-        staff_states = [StaffState.from_changes(s.name, [], span) for s in session.staff]
+        staff_states = [StaffState.from_info(s, span) for s in session.staff]
 
         # Resolve: empty/pending associated_person_ids → all staff; None dates → global span
         all_staff_ids = [s.name for s in session.staff]
@@ -730,7 +730,6 @@ def _build_algorithm_info() -> None:
 
 **暂不考虑的信息（MVP）：**
 - 📌 业务线匹配（导入导出保留，生成不用）
-- 📌 入职/离职时间（导入导出保留，生成不用）
 - 📌 年假（MVP 默认 0）
 - 📌 生命周期时间点（MVP 默认全期均匀）
 - 📌 人事变更记录（MVP 默认全区间在职）
