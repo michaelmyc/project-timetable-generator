@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from timetable_generator.generator.capacity import compute_project_local_capacity, compute_workdays
-from timetable_generator.generator.greedy import generate
+from timetable_generator.generator.retry import generate_with_retry
 from timetable_generator.generator.validator import validate
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_info import StaffInfo
@@ -269,7 +269,8 @@ def run_one_case(inp: StressInput) -> CaseResult:
     workdays = compute_workdays(inp.global_span, inp.holidays)
     t0 = time.perf_counter()
     try:
-        records = generate(inp.projects, states, inp.holidays, inp.global_span)
+        result = generate_with_retry(inp.projects, states, inp.holidays, inp.global_span)
+        records = result.records
     except Exception as e:
         return CaseResult(
             seed=inp.seed,
