@@ -71,16 +71,34 @@ def generate(
         state = staff_by_id.get(person_id)
         if state is None:
             continue
-        # Index commitments by day for fast lookup.
+        # Index commitments by day. Count coverage to find "exclusive" days
+        # (only one commitment covers that day) — those get full 8h for that
+        # commitment without proportional sharing, so narrow-overlap commitments
+        # with unique days aren't starved by shared-day competition.
         day_to_commitments: dict[date, list[PersonProjectPlan]] = defaultdict(list)
         for pp in commitments:
             for d in pp.overlap_days:
                 day_to_commitments[d].append(pp)
+        exclusive: dict[date, PersonProjectPlan] = {
+            d: lst[0] for d, lst in day_to_commitments.items() if len(lst) == 1
+        }
         # Active workdays for this person, in order.
         person_wds = sorted(wd for wd in workdays if state.is_active_on(wd))
         for wd in person_wds:
             avail = FULL_DAY_HOURS
-            # Commitments covering this day with remaining target.
+            # Exclusive day → full capacity to the single covering commitment.
+            excl = exclusive.get(wd)
+            if excl is not None and filled[(excl.project_id, excl.person_id)] < excl.total:
+                rem = excl.total - filled[(excl.project_id, excl.person_id)]
+                h = min(avail, rem)
+                if h > 0:
+                    records.append(WorkHourRecord(excl.project_id, excl.person_id, wd, h))
+                    person_day_hours[(person_id, wd)] += h
+                    filled[(excl.project_id, excl.person_id)] += h
+                    avail -= h
+                if avail <= 0:
+                    continue
+            # Shared day (or exclusive commitment already filled) → proportional.
             active = [
                 pp
                 for pp in day_to_commitments.get(wd, [])
@@ -88,11 +106,7 @@ def generate(
             ]
             if not active:
                 continue
-            # Proportional share by the planner's uniform rate. Pop commitments
-            # one at a time (highest rate first); each computes its share against
-            # the *remaining* queue's total rate, so proportions stay correct
-            # regardless of order.
-            queue = [pp for pp in active if filled[(pp.project_id, pp.person_id)] < pp.total]
+            queue = list(active)
             queue.sort(key=lambda p: p.rate, reverse=True)
             while queue and avail > 0:
                 total_rate = sum(p.rate for p in queue)
