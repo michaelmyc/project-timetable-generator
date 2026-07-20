@@ -213,8 +213,7 @@ def _gen_projects(
         )
         local_cap = compute_project_local_capacity(probe, states, workdays)
         if local_cap <= 0:
-            # No overlap at all; skip this project (regenerate would bias the sample)
-            # Use a trivial 0-ratio project so it doesn't bias stress results.
+            # No overlap at all; use a trivial 0-ratio project.
             projects.append(
                 Project(
                     id=f"p{i + 1}",
@@ -231,6 +230,31 @@ def _gen_projects(
         ratio_max = min(config.ratio_range[1], 0.95)
         ratio_min = config.ratio_range[0]
         target_ratio = rng.uniform(ratio_min, ratio_max)
+
+        # --- Person-day overcommit guard ---
+        # For each associated person, check if adding this project's ratio would
+        # push their daily Σratio above 1.0 on any day in the project span. If so,
+        # lower this project's ratio so it fits (the "超了就降" strategy).
+        states_for_check = [StaffState.from_info(s, span) for s in staff]
+        state_by_id = {s.person_id: s for s in states_for_check}
+        for pid in associated:
+            st = state_by_id.get(pid)
+            if st is None:
+                continue
+            for wd in workdays:
+                if not (p_start <= wd <= p_end) or not st.is_active_on(wd):
+                    continue
+                # Sum of existing projects' ratios covering this (person, day)
+                existing_ratio = sum(
+                    p.target_ratio
+                    for p in projects
+                    if pid in p.associated_person_ids and p.start_date <= wd <= p.end_date
+                )
+                # This project would add target_ratio; cap so existing + target ≤ 1.0
+                room = 1.0 - existing_ratio
+                if room < target_ratio:
+                    target_ratio = max(ratio_min * 0.5, room)  # lower but keep nonzero
+        target_ratio = max(0.0, min(target_ratio, ratio_max))
         projects.append(
             Project(
                 id=f"p{i + 1}",
