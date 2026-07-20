@@ -113,7 +113,18 @@ SCENARIOS: list[StressConfig] = [
         ci_cases=30,
         full_cases=200,
     ),
+    StressConfig(
+        name="realistic",
+        description="真实场景 — 10+人、多项目、长周期、低离职率",
+        staff_count_range=(10, 30),
+        project_count_range=(5, 15),
+        span_days_range=(90, 365),
+        overlap_tightness=0.3,
+        ratio_range=(0.2, 0.6),
+        churn_rate=0.15,
+        pool_size_range=(3, 10),
+        ci_cases=30,
+        full_cases=100,
+    ),
 ]
-
-# CI subset: lightweight scenarios for default pytest runs.
-CI_SCENARIO_NAMES = {"baseline", "tight_overlap"}
+CI_SCENARIO_NAMES = {"baseline", "tight_overlap", "realistic"}

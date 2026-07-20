@@ -25,7 +25,7 @@ GATES = {
     "elapsed_p95_medium": 10.0,
     "elapsed_p95_large": 60.0,
 }
-LARGE_SCENARIOS = {"large"}
+LARGE_SCENARIOS = {"large", "realistic"}
 
 
 def _case_count(config, full: bool) -> int:
@@ -52,6 +52,17 @@ def test_tight_overlap(write_report) -> None:
     report = run_stress(cfg, _case_count(cfg, "--full" in sys.argv))
     write_report(report, "tight_overlap.json")
     _assert_gates(report, is_large=False)
+
+
+@pytest.mark.stress
+def test_realistic(write_report) -> None:
+    """Realistic scenario — 10+ staff, many projects, long span, low churn."""
+    from tests.test_stress.conftest import get_scenario
+
+    cfg = get_scenario("realistic")
+    report = run_stress(cfg, _case_count(cfg, "--full" in sys.argv))
+    write_report(report, "realistic.json")
+    _assert_gates(report, is_large=True)
 
 
 def _assert_gates(report, is_large: bool) -> None:
