@@ -121,16 +121,24 @@ def plan(
 ) -> PlanResult:
     """Run phase 1: produce commitments for each (project, person).
 
-    ``rng`` (optional) randomizes project order and person selection so retry
-    produces varied results. Without rng, the planner is deterministic.
+    Strategy Q: per-project quota is split among associated persons in proportion
+    to each person's overlap days. No sequential capacity deduction — each person
+    gets their share independently. This eliminates ordering dependence: no
+    project "goes first" to monopolize a person.
+
+    Overcommit (one person on many high-ratio projects) degrades gracefully —
+    each project gets its proportional share of that person, fill resolves the
+    daily 8h split.
+
+    ``rng`` (optional) shuffles project order for retry diversity (affects which
+    projects get slightly more due to int rounding, but no structural advantage).
     """
     workdays = compute_workdays(global_span, holidays)
     by_id = {s.person_id: s for s in staff_states}
 
     result = PlanResult()
 
-    # Precompute local capacity + quota + tension for ordering.
-    project_meta: list[tuple[Project, int, int, float]] = []
+    # Precompute local capacity + quota. Physical infeasibility check.
     for p in projects:
         local_cap = compute_project_local_capacity(p, staff_states, workdays)
         quota = int(local_cap * p.target_ratio)
@@ -140,26 +148,22 @@ def plan(
             raise InfeasibleProjectError(p.id, quota, local_cap)
         result.quotas[p.id] = quota
         result.local_capacities[p.id] = local_cap
-        project_meta.append((p, quota, local_cap, _project_tension(p, quota, local_cap)))
 
-    # Order: tension-descending as a base, but with rng, shuffle fully so retry
-    # explores different project processing orders.
+    # Process projects (order only affects int-rounding distribution, not
+    # structural allocation — every person gets their overlap-proportional share).
+    project_list = list(projects)
     if rng:
-        rng.shuffle(project_meta)
-    else:
-        project_meta.sort(key=lambda t: t[3], reverse=True)
+        rng.shuffle(project_list)
 
-    # All commitments so far (used to compute remaining theoretical capacity).
-    all_commitments: list[PersonProjectPlan] = []
-
-    for project, quota, _local_cap, _tension in project_meta:
+    for project in project_list:
+        quota = result.quotas.get(project.id, 0)
         if quota <= 0:
             result.gaps[project.id] = 0
             continue
 
-        # Candidate persons: associated, with non-empty overlap, sorted by remaining
-        # *theoretical* capacity on this project's overlap (most remaining first).
-        candidates: list[tuple[str, list[date], int]] = []
+        # Compute each associated person's overlap with this project.
+        person_overlaps: list[tuple[str, list[date]]] = []
+        total_overlap = 0
         for pid in project.associated_person_ids:
             state = by_id.get(pid)
             if state is None:
@@ -167,98 +171,35 @@ def plan(
             ov = _overlap_days(state, project, workdays)
             if not ov:
                 continue
-            remaining_cap = _remaining_theoretical_capacity(pid, ov, all_commitments)
-            if remaining_cap <= 0:
-                continue
-            candidates.append((pid, ov, remaining_cap))
+            person_overlaps.append((pid, ov))
+            total_overlap += len(ov)
 
-        if not candidates:
+        if not person_overlaps or total_overlap == 0:
             result.gaps[project.id] = quota
             continue
 
-        # Target headcount: theoretical minimum overshot by factor.
-        m_days = max(1, (project.end_date - project.start_date).days + 1)
-        min_persons = max(1, math.ceil(quota / (m_days * FULL_DAY_HOURS)))
-        target_count = max(min_persons, math.ceil(min_persons * TARGET_PERSONS_OVERSHOOT))
-
-        if rng:
-            rng.shuffle(candidates)
-        else:
-            candidates.sort(key=lambda c: c[2], reverse=True)
-
-        remaining_quota = quota
-        planned_for_project: list[PersonProjectPlan] = []
-
-        # First pass: allocate to the top target_count persons by overlap proportion.
-        chosen = candidates[:target_count]
-        total_overlap = sum(len(ov) for _, ov, _ in chosen) or 1
-
-        for pid, ov, _rem in chosen:
-            if remaining_quota <= 0:
-                break
-            share = int(remaining_quota * (len(ov) / total_overlap))
-            # Bound by this person's remaining theoretical capacity on overlap.
-            rem_cap = _remaining_theoretical_capacity(
-                pid, ov, all_commitments + planned_for_project
-            )
-            share = min(share, rem_cap)
+        # Split quota by overlap proportion. Each person gets an independent
+        # share — no deduction of other projects' commitments.
+        committed = 0
+        for pid, ov in person_overlaps:
+            share = int(quota * len(ov) / total_overlap)
             if share <= 0:
                 continue
-            rate = min(MAX_UNIFORM_RATE, share / len(ov))
+            rate = share / len(ov)
             total = int(rate * len(ov))
             if total <= 0:
                 continue
-            plan_item = PersonProjectPlan(
-                person_id=pid,
-                project_id=project.id,
-                overlap_days=list(ov),
-                rate=rate,
-                total=total,
+            result.plans.append(
+                PersonProjectPlan(
+                    person_id=pid,
+                    project_id=project.id,
+                    overlap_days=list(ov),
+                    rate=rate,
+                    total=total,
+                )
             )
-            planned_for_project.append(plan_item)
-            all_commitments.append(plan_item)
-            remaining_quota -= total
+            committed += total
 
-        # Second pass: residual quota spread across any candidate with remaining
-        # theoretical capacity (re-using already-planned persons allowed).
-        if remaining_quota > 0:
-            for pid, ov, _rem in candidates:
-                if remaining_quota <= 0:
-                    break
-                rem_cap = _remaining_theoretical_capacity(pid, ov, all_commitments)
-                if rem_cap <= 0:
-                    continue
-                extra = min(remaining_quota, rem_cap)
-                rate = min(MAX_UNIFORM_RATE, extra / len(ov))
-                total = int(rate * len(ov))
-                if total <= 0:
-                    continue
-                existing = next((pp for pp in planned_for_project if pp.person_id == pid), None)
-                if existing is not None:
-                    existing.total += total
-                    existing.rate = existing.total / len(existing.overlap_days)
-                    all_commitments.append(
-                        PersonProjectPlan(
-                            person_id=pid,
-                            project_id=project.id,
-                            overlap_days=list(ov),
-                            rate=rate,
-                            total=total,
-                        )
-                    )
-                else:
-                    plan_item = PersonProjectPlan(
-                        person_id=pid,
-                        project_id=project.id,
-                        overlap_days=list(ov),
-                        rate=rate,
-                        total=total,
-                    )
-                    planned_for_project.append(plan_item)
-                    all_commitments.append(plan_item)
-                remaining_quota -= total
-
-        result.plans.extend(planned_for_project)
-        result.gaps[project.id] = max(0, remaining_quota)
+        result.gaps[project.id] = max(0, quota - committed)
 
     return result
