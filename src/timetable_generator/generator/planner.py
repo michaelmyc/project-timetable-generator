@@ -12,9 +12,8 @@ This matches the design intent: a rough plan that avoids one project hoarding
 a person, with residual conflicts resolved at fill time.
 """
 
-from __future__ import annotations
-
 import math
+import random
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -118,8 +117,13 @@ def plan(
     staff_states: list[StaffState],
     holidays: set[date],
     global_span: GlobalSpan,
+    rng: random.Random | None = None,
 ) -> PlanResult:
-    """Run phase 1: produce commitments for each (project, person)."""
+    """Run phase 1: produce commitments for each (project, person).
+
+    ``rng`` (optional) randomizes project order and person selection so retry
+    produces varied results. Without rng, the planner is deterministic.
+    """
     workdays = compute_workdays(global_span, holidays)
     by_id = {s.person_id: s for s in staff_states}
 
@@ -138,8 +142,12 @@ def plan(
         result.local_capacities[p.id] = local_cap
         project_meta.append((p, quota, local_cap, _project_tension(p, quota, local_cap)))
 
-    # Toughest first (higher tension = quota close to capacity).
-    project_meta.sort(key=lambda t: t[3], reverse=True)
+    # Order: tension-descending as a base, but with rng, shuffle fully so retry
+    # explores different project processing orders.
+    if rng:
+        rng.shuffle(project_meta)
+    else:
+        project_meta.sort(key=lambda t: t[3], reverse=True)
 
     # All commitments so far (used to compute remaining theoretical capacity).
     all_commitments: list[PersonProjectPlan] = []
@@ -173,7 +181,10 @@ def plan(
         min_persons = max(1, math.ceil(quota / (m_days * FULL_DAY_HOURS)))
         target_count = max(min_persons, math.ceil(min_persons * TARGET_PERSONS_OVERSHOOT))
 
-        candidates.sort(key=lambda c: c[2], reverse=True)
+        if rng:
+            rng.shuffle(candidates)
+        else:
+            candidates.sort(key=lambda c: c[2], reverse=True)
 
         remaining_quota = quota
         planned_for_project: list[PersonProjectPlan] = []

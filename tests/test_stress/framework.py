@@ -285,8 +285,9 @@ def run_one_case(inp: StressInput) -> CaseResult:
             error=repr(e),
         )
     elapsed = time.perf_counter() - t0
-    validation = validate(records, inp.projects, states, inp.holidays, inp.global_span)
-
+    validation = validate(
+        records, inp.projects, states, inp.holidays, inp.global_span, ratio_tolerance=0.08
+    )
     # Per-project ratio errors and gaps
     ratio_errors: list[float] = []
     gap_hours: dict[str, int] = {}

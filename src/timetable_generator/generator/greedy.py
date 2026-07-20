@@ -41,14 +41,14 @@ def generate(
     staff_states: list[StaffState],
     holidays: set[date],
     global_span: GlobalSpan,
-    rng: random.Random | None = None,  # noqa: ARG001 — kept for backward compat
+    rng: random.Random | None = None,
 ) -> list[WorkHourRecord]:
     """Two-phase generation: plan commitments, then fill concrete hours."""
     if not projects:
         return []
 
     # Phase 1: plan. Raises InfeasibleProjectError if any project is physically impossible.
-    plan_result = plan(projects, staff_states, holidays, global_span)
+    plan_result = plan(projects, staff_states, holidays, global_span, rng)
 
     # Phase 2: fill concrete hours honoring commitments.
     workdays = compute_workdays(global_span, holidays)
