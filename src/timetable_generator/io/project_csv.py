@@ -18,6 +18,7 @@ import csv
 from datetime import date
 from pathlib import Path
 
+from timetable_generator.io.csv_reader import read_csv_rows
 from timetable_generator.models.project import Project
 
 REQUIRED_COLUMNS = [
@@ -53,11 +54,7 @@ def _read_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]]]:
-    with path.open(newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        fieldnames = list(reader.fieldnames or [])
-        rows = list(reader)
-    return fieldnames, rows
+    return read_csv_rows(path)
 
 
 def _read_xlsx(path: Path) -> tuple[list[str], list[dict[str, str]]]:

@@ -302,7 +302,9 @@ def _import_staff(session, staff_table) -> None:
 
         async def _on_upload(e):
             try:
-                tmp = Path("/tmp/_staff_import.tmp")
+                import tempfile
+
+                tmp = Path(tempfile.mktemp(suffix=Path(e.file.name).suffix))
                 await e.file.save(tmp)
                 imported = import_staff_csv(tmp)
                 session.staff.extend(imported)
@@ -314,7 +316,9 @@ def _import_staff(session, staff_table) -> None:
             except Exception as ex:
                 ui.notify(f"导入失败: {ex}", type="negative")
 
-        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True).classes("w-full")
+        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True).classes("w-full").props(
+            'accept=".csv,.xlsx,.xlsm"'
+        )
         with ui.row():
             ui.button("取消", on_click=dialog.close)
     dialog.open()
@@ -501,7 +505,9 @@ def _import_projects(session) -> None:
 
         async def _on_upload(e):
             try:
-                tmp = Path("/tmp/_project_import.tmp")
+                import tempfile
+
+                tmp = Path(tempfile.mktemp(suffix=Path(e.file.name).suffix))
                 await e.file.save(tmp)
                 imported = import_projects_csv(tmp)
                 session.projects.extend(imported)
@@ -515,7 +521,9 @@ def _import_projects(session) -> None:
             except Exception as ex:
                 ui.notify(f"导入失败: {ex}", type="negative")
 
-        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True).classes("w-full")
+        ui.upload(label="选择文件", on_upload=_on_upload, auto_upload=True).classes("w-full").props(
+            'accept=".csv,.xlsx,.xlsm"'
+        )
         with ui.row():
             ui.button("取消", on_click=dialog.close)
     dialog.open()

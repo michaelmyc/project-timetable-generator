@@ -10,9 +10,8 @@ When packaged with PyInstaller (frozen), defaults to native window mode
 unless --web is explicitly passed.
 """
 
-import sys
-
 import multiprocessing
+import sys
 
 from nicegui import app, ui
 
