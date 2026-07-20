@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from timetable_generator.generator.planner import OvercommitError
+from timetable_generator.generator.planner import ProjectTotalRatioError
 from timetable_generator.generator.retry import GenerationError, generate_with_retry
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
@@ -16,8 +16,8 @@ def test_capacity_conflict_reports_person_and_projects():
     staff = [StaffState.from_changes("u1", [], span)]
     p1 = Project("p1", "A", date(2026, 3, 2), date(2026, 3, 13), 0.7, ["研发人员"], ["u1"])
     p2 = Project("p2", "B", date(2026, 3, 2), date(2026, 3, 13), 0.7, ["研发人员"], ["u1"])
-    # Combined ratio = 1.4 > 1.0 → impossible to satisfy both
-    with pytest.raises(OvercommitError):
+    # Combined project ratio = 1.4 > 1.0 → ProjectTotalRatioError
+    with pytest.raises(ProjectTotalRatioError):
         generate_with_retry(
             projects=[p1, p2],
             staff_states=staff,

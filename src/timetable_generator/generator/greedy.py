@@ -1,12 +1,20 @@
-"""Two-phase greedy generator.
+"""Single-phase online greedy generator.
 
-Phase 1 (planner): produce per (project, person) commitments with a uniform
-daily rate over the person's active∩project-span workdays. See planner.py.
+No separate planner/fill phases. For each person, walk their active workdays in
+order. On each day, split the 8h capacity among all projects that (a) the person
+is associated with and (b) cover this day, in proportion to each project's
+*remaining quota* (quota − hours already filled across all days so far).
 
-Phase 2 (fill): honor commitments by walking each person's active workdays and
-splitting the 8h/day capacity among all commitments covering that day in
-proportion to their remaining target. This resolves day-level conflicts by
-proportional sharing, eliminating first-come-first-served order dependence.
+This is an online algorithm: the daily split adapts to how much each project
+still needs. A project that has already received most of its quota gets a
+smaller share; a project that is far from its quota gets a larger share. The
+total naturally converges toward each project's quota without a pre-computed
+fixed commitment.
+
+Physical infeasibility (project quota > local capacity, or total Σratio > 1.0)
+is checked upfront. Person-day overcommit (one person on many high-ratio
+projects) is NOT an error — the algorithm distributes 8h proportionally, and
+projects simply get less than their target ratio (resource scarcity, not error).
 """
 
 from __future__ import annotations
@@ -15,14 +23,16 @@ import random
 from collections import defaultdict
 from datetime import date
 
-from timetable_generator.generator.capacity import compute_workdays
-from timetable_generator.generator.planner import PersonProjectPlan, plan
+from timetable_generator.generator.capacity import (
+    compute_project_local_capacity,
+    compute_workdays,
+)
+from timetable_generator.generator.planner import InfeasibleProjectError, ProjectTotalRatioError
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
 from timetable_generator.models.work_hour import WorkHourRecord
 
 FULL_DAY_HOURS = 8
-MIN_SPURT_DAYS = 3  # each continuous spurt >= 3 days (soft, not yet enforced)
 
 
 def generate_single(
@@ -41,105 +51,121 @@ def generate(
     staff_states: list[StaffState],
     holidays: set[date],
     global_span: GlobalSpan,
-    rng: random.Random | None = None,
+    rng: random.Random | None = None,  # noqa: ARG001 — kept for backward compat
 ) -> list[WorkHourRecord]:
-    """Two-phase generation: plan commitments, then fill concrete hours."""
+    """Generate work-hour records by per-person per-day online proportional split.
+
+    No pre-computed commitments. Each day, 8h is split by remaining quota.
+    """
     if not projects:
         return []
 
-    # Phase 1: plan. Raises InfeasibleProjectError if any project is physically impossible.
-    plan_result = plan(projects, staff_states, holidays, global_span, rng)
-
-    # Phase 2: fill concrete hours honoring commitments.
     workdays = compute_workdays(global_span, holidays)
     if not workdays:
         return []
 
-    person_day_hours: dict[tuple[str, date], int] = defaultdict(int)
-    records: list[WorkHourRecord] = []
+    # --- Upfront feasibility checks ---
+    # 1. Project total ratio > 1.0 → user config error.
+    total_ratio = sum(p.target_ratio for p in projects)
+    if total_ratio > 1.0 + 1e-9:
+        raise ProjectTotalRatioError(total_ratio)
+
+    # 2. Per-project physical infeasibility (quota > local capacity).
+    quotas: dict[str, int] = {}
+    for p in projects:
+        local_cap = compute_project_local_capacity(p, staff_states, workdays)
+        quota = int(local_cap * p.target_ratio)
+        if quota > local_cap and local_cap > 0:
+            raise InfeasibleProjectError(p.id, quota, local_cap)
+        if local_cap == 0 and quota > 0:
+            raise InfeasibleProjectError(p.id, quota, local_cap)
+        quotas[p.id] = quota
+
     staff_by_id = {s.person_id: s for s in staff_states}
+    project_by_id = {p.id: p for p in projects}
 
-    # Group commitments by person.
-    plans_by_person: dict[str, list[PersonProjectPlan]] = defaultdict(list)
-    for pp in plan_result.plans:
-        plans_by_person[pp.person_id].append(pp)
+    # Track filled hours per project (across all persons, all days).
+    project_filled: dict[str, int] = defaultdict(int)
+    records: list[WorkHourRecord] = []
 
-    # Per-commitment filled-so-far tracker.
-    filled: dict[tuple[str, str], int] = defaultdict(int)
+    # Index: person_id → date → list of project_ids covering that day.
+    person_day_projects: dict[str, dict[date, list[str]]] = defaultdict(lambda: defaultdict(list))
+    for project in projects:
+        for pid in project.associated_person_ids:
+            state = staff_by_id.get(pid)
+            if state is None:
+                continue
+            for wd in workdays:
+                if project.start_date <= wd <= project.end_date and state.is_active_on(wd):
+                    person_day_projects[pid][wd].append(project.id)
 
-    for person_id, commitments in plans_by_person.items():
-        state = staff_by_id.get(person_id)
-        if state is None:
-            continue
-        # Index commitments by day. Count coverage to find "exclusive" days
-        # (only one commitment covers that day) — those get full 8h for that
-        # commitment without proportional sharing, so narrow-overlap commitments
-        # with unique days aren't starved by shared-day competition.
-        day_to_commitments: dict[date, list[PersonProjectPlan]] = defaultdict(list)
-        for pp in commitments:
-            for d in pp.overlap_days:
-                day_to_commitments[d].append(pp)
-        exclusive: dict[date, PersonProjectPlan] = {
-            d: lst[0] for d, lst in day_to_commitments.items() if len(lst) == 1
-        }
-        # Active workdays for this person, in order.
-        person_wds = sorted(wd for wd in workdays if state.is_active_on(wd))
-        for wd in person_wds:
+    # Walk each person's active workdays in order.
+    # Process persons in rng-shuffled order for retry diversity.
+    person_ids = list(person_day_projects.keys())
+    if rng:
+        rng.shuffle(person_ids)
+
+    for person_id in person_ids:
+        day_map = person_day_projects[person_id]
+        for wd in sorted(day_map):
+            covering_pids = day_map[wd]
+            if not covering_pids:
+                continue
+
+            # Compute remaining quota for each covering project.
+            remaining: list[tuple[str, int]] = []
+            for pid in covering_pids:
+                rem = quotas[pid] - project_filled[pid]
+                if rem > 0:
+                    remaining.append((pid, rem))
+
+            if not remaining:
+                continue
+
             avail = FULL_DAY_HOURS
-            # Exclusive day → full capacity to the single covering commitment.
-            excl = exclusive.get(wd)
-            if excl is not None and filled[(excl.project_id, excl.person_id)] < excl.total:
-                rem = excl.total - filled[(excl.project_id, excl.person_id)]
+
+            # Single project covers this day → give it all 8h (capped by remaining).
+            if len(remaining) == 1:
+                pid, rem = remaining[0]
                 h = min(avail, rem)
                 if h > 0:
-                    records.append(WorkHourRecord(excl.project_id, excl.person_id, wd, h))
-                    person_day_hours[(person_id, wd)] += h
-                    filled[(excl.project_id, excl.person_id)] += h
-                    avail -= h
-                if avail <= 0:
-                    continue
-            # Shared day (or exclusive commitment already filled) → proportional.
-            active = [
-                pp
-                for pp in day_to_commitments.get(wd, [])
-                if filled[(pp.project_id, pp.person_id)] < pp.total
-            ]
-            if not active:
+                    records.append(WorkHourRecord(pid, person_id, wd, h))
+                    project_filled[pid] += h
                 continue
-            queue = list(active)
-            queue.sort(key=lambda p: p.rate, reverse=True)
-            while queue and avail > 0:
-                total_rate = sum(p.rate for p in queue)
-                if total_rate <= 0:
+
+            # Multiple projects: split 8h by remaining quota proportion.
+            total_remaining = sum(rem for _, rem in remaining)
+            # Sort by remaining desc (largest gap first) with rng jitter for diversity.
+            remaining.sort(key=lambda x: x[1] + (rng.random() if rng else 0), reverse=True)
+
+            for pid, rem in remaining:
+                if avail <= 0:
                     break
-                pp = queue.pop(0)
-                rem = pp.total - filled[(pp.project_id, pp.person_id)]
-                if rem <= 0:
-                    continue
-                share = int(avail * pp.rate / total_rate)
+                share = int(FULL_DAY_HOURS * rem / total_remaining)
                 share = max(1, min(share, avail, rem))
                 if share <= 0:
                     continue
-                records.append(WorkHourRecord(pp.project_id, pp.person_id, wd, share))
-                person_day_hours[(person_id, wd)] += share
-                filled[(pp.project_id, pp.person_id)] += share
+                records.append(WorkHourRecord(pid, person_id, wd, share))
+                project_filled[pid] += share
                 avail -= share
+
+            # Leftover from int truncation → give to largest remaining.
             if avail > 0:
-                leftover = [pp for pp in active if filled[(pp.project_id, pp.person_id)] < pp.total]
-                leftover.sort(
-                    key=lambda pp: pp.total - filled[(pp.project_id, pp.person_id)],
-                    reverse=True,
-                )
-                for pp in leftover:
+                # Recompute remaining (some may have been filled).
+                still_needy = [
+                    (pid, quotas[pid] - project_filled[pid])
+                    for pid in covering_pids
+                    if quotas[pid] - project_filled[pid] > 0
+                ]
+                still_needy.sort(key=lambda x: x[1], reverse=True)
+                for pid, rem in still_needy:
                     if avail <= 0:
                         break
-                    rem = pp.total - filled[(pp.project_id, pp.person_id)]
-                    give = min(1, avail, rem)
+                    give = min(avail, rem)
                     if give <= 0:
                         continue
-                    records.append(WorkHourRecord(pp.project_id, pp.person_id, wd, give))
-                    person_day_hours[(person_id, wd)] += give
-                    filled[(pp.project_id, pp.person_id)] += give
+                    records.append(WorkHourRecord(pid, person_id, wd, give))
+                    project_filled[pid] += give
                     avail -= give
 
     return records

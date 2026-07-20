@@ -85,6 +85,17 @@ class OvercommitError(ValueError):
         self.projects = projects
 
 
+class ProjectTotalRatioError(ValueError):
+    """Raised when the sum of all projects' target_ratio exceeds 1.0."""
+
+    def __init__(self, total_ratio: float) -> None:
+        super().__init__(
+            f"所有项目的投入比例之和 = {total_ratio:.0%}，超过 100%。"
+            f"请降低部分项目的 target_ratio。"
+        )
+        self.total_ratio = total_ratio
+
+
 def _overlap_days(state: StaffState, project: Project, workdays: list[date]) -> list[date]:
     return [
         wd
@@ -162,21 +173,9 @@ def plan(
             raise InfeasibleProjectError(p.id, quota, local_cap)
         result.quotas[p.id] = quota
         result.local_capacities[p.id] = local_cap
-
-    # Person-day overcommit check: each person's daily Σratio must be ≤ 1.0.
-    for s in staff_states:
-        for wd in workdays:
-            if not s.is_active_on(wd):
-                continue
-            covering = [
-                p
-                for p in projects
-                if s.person_id in p.associated_person_ids and p.start_date <= wd <= p.end_date
-            ]
-            total_ratio = sum(p.target_ratio for p in covering)
-            if total_ratio > 1.0 + 1e-9:
-                raise OvercommitError(s.person_id, wd, total_ratio, [p.id for p in covering])
-
+    # Person-day overcommit is NOT checked here — it's a resource scarcity
+    # situation, not a config error. The generator handles it by distributing
+    # 8h proportionally among covering projects.
     # Process projects (order only affects int-rounding distribution, not
     # structural allocation — every person gets their overlap-proportional share).
     project_list = list(projects)

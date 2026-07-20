@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from timetable_generator.generator.capacity import compute_project_local_capacity, compute_workdays
-from timetable_generator.generator.planner import OvercommitError
+from timetable_generator.generator.planner import ProjectTotalRatioError
 from timetable_generator.generator.retry import generate_with_retry
 from timetable_generator.generator.validator import validate
 from timetable_generator.models.project import Project
@@ -232,29 +232,15 @@ def _gen_projects(
         ratio_min = config.ratio_range[0]
         target_ratio = rng.uniform(ratio_min, ratio_max)
 
-        # --- Person-day overcommit guard ---
-        # For each associated person, check if adding this project's ratio would
-        # push their daily Σratio above 1.0 on any day in the project span. If so,
-        # lower this project's ratio so it fits (the "超了就降" strategy).
-        states_for_check = [StaffState.from_info(s, span) for s in staff]
-        state_by_id = {s.person_id: s for s in states_for_check}
-        for pid in associated:
-            st = state_by_id.get(pid)
-            if st is None:
-                continue
-            for wd in workdays:
-                if not (p_start <= wd <= p_end) or not st.is_active_on(wd):
-                    continue
-                # Sum of existing projects' ratios covering this (person, day)
-                existing_ratio = sum(
-                    p.target_ratio
-                    for p in projects
-                    if pid in p.associated_person_ids and p.start_date <= wd <= p.end_date
-                )
-                # This project would add target_ratio; cap so existing + target ≤ 1.0
-                room = 1.0 - existing_ratio
-                if room < target_ratio:
-                    target_ratio = max(ratio_min * 0.5, room)  # lower but keep nonzero
+        # --- Project total ratio guard ---
+        # Ensure sum of all projects' target_ratio stays ≤ 1.0 (user config
+        # feasibility). Person-day overcommit is allowed — the algorithm
+        # distributes 8h proportionally when one person is on many projects.
+        existing_total = sum(p.target_ratio for p in projects)
+        # Cap so existing + this project's ratio ≤ 1.0
+        room = 1.0 - existing_total
+        if room < target_ratio:
+            target_ratio = max(0.0, room)
         target_ratio = max(0.0, min(target_ratio, ratio_max))
         projects.append(
             Project(
@@ -296,8 +282,8 @@ def run_one_case(inp: StressInput) -> CaseResult:
     try:
         result = generate_with_retry(inp.projects, states, inp.holidays, inp.global_span)
         records = result.records
-    except OvercommitError:
-        # Configuration problem (person overcommitted), not an algorithm failure.
+    except ProjectTotalRatioError:
+        # Project total ratio > 1.0 → user config error, not algorithm failure.
         return CaseResult(
             seed=inp.seed,
             success=True,  # don't count as algorithm failure

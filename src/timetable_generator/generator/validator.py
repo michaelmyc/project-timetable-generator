@@ -130,12 +130,16 @@ def validate(
                     record=r,
                 )
             )
-
-    # Check job type coverage (skip if project has no required job types)
+    # Check job type coverage (skip if project has no required job types or no quota)
     staff_by_id = {s.person_id: s for s in staff_states}
+    workdays_for_check = compute_workdays(global_span, holidays)
     for project in projects:
         if not project.required_job_types:
-            continue  # No job type constraint → skip coverage check
+            continue  # No job type constraint → skip
+        # Skip projects with zero quota (ratio=0 → no investment needed)
+        local_cap = compute_project_local_capacity(project, staff_states, workdays_for_check)
+        if int(local_cap * project.target_ratio) <= 0:
+            continue
         # Find all persons with records on this project
         persons_on_project = {r.person_id for r in records if r.project_id == project.id}
         # Check each required job type has at least 1 person

@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 
 from timetable_generator.generator.greedy import generate
-from timetable_generator.generator.planner import OvercommitError
+from timetable_generator.generator.planner import ProjectTotalRatioError
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_info import StaffInfo
 from timetable_generator.models.staff_state import GlobalSpan, StaffState
@@ -93,17 +93,17 @@ def _test_invariants(seed: int) -> None:
 def test_invariants_20_random_inputs():
     """Run 20 random inputs, verify all invariants hold."""
     for seed in range(20):
-        with contextlib.suppress(OvercommitError):
+        with contextlib.suppress(ProjectTotalRatioError):
             _test_invariants(seed)
 
 
 def test_invariant_no_overselling_beyond_daily_capacity():
-    """3 projects each 50% on same person → OvercommitError (config problem)."""
+    """3 projects each 50% → ProjectTotalRatioError (total > 100%)."""
     span = GlobalSpan(date(2026, 3, 2), date(2026, 3, 13))
     states = [StaffState.from_info(StaffInfo(name="u1"), span)]
     projects = [
         Project(f"p{i}", f"P{i}", date(2026, 3, 2), date(2026, 3, 13), 0.5, ["研发人员"], ["u1"])
         for i in range(3)
     ]
-    with pytest.raises(OvercommitError):
+    with pytest.raises(ProjectTotalRatioError):
         generate(projects, states, set(), span)
