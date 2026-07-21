@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from timetable_generator.io.date_utils import parse_date_flexible
 from timetable_generator.models.project import Project
 from timetable_generator.models.staff_info import StaffInfo
 from timetable_generator.models.staff_state import GlobalSpan
@@ -36,7 +37,7 @@ def _serialize_date(d: date | None) -> str | None:
 
 
 def _parse_date(s: str | None) -> date | None:
-    return date.fromisoformat(s) if s else None
+    return parse_date_flexible(s)
 
 
 def _global_span_to_dict(span: GlobalSpan) -> dict:

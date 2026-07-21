@@ -26,6 +26,7 @@ from timetable_generator.export.csv import export_csv
 from timetable_generator.generator.retry import generate_with_retry
 from timetable_generator.holiday.cache import HolidayCache
 from timetable_generator.holiday.orchestrator import HolidayOrchestrator
+from timetable_generator.io.date_utils import parse_date_flexible
 from timetable_generator.io.project_csv import export_projects_csv, import_projects_csv
 from timetable_generator.io.staff_csv import export_staff_csv, import_staff_csv
 from timetable_generator.models.project import Project
@@ -138,8 +139,8 @@ def _build_global_span(session: SessionState) -> None:
         if not start_val or not end_val:
             return
         try:
-            start = date.fromisoformat(str(start_val))
-            end = date.fromisoformat(str(end_val))
+            start = parse_date_flexible(str(start_val))
+            end = parse_date_flexible(str(end_val))
         except ValueError:
             ui.notify("日期格式不合法", type="warning")
             return
@@ -234,8 +235,8 @@ def _show_staff_dialog(session, staff_table, edit_index: int | None) -> None:
             bl = str(bl_input.value or "").strip() or None
             if bl:
                 session.add_business_line(bl)
-            onboard = date.fromisoformat(str(onboard_input.value)) if onboard_input.value else None
-            leave = date.fromisoformat(str(leave_input.value)) if leave_input.value else None
+            onboard = parse_date_flexible(onboard_input.value) if onboard_input.value else None
+            leave = parse_date_flexible(leave_input.value) if leave_input.value else None
             staff = StaffInfo(
                 name=name,
                 job_type=job,
@@ -423,8 +424,8 @@ def _show_project_dialog(session, project_table, edit_index: int | None) -> None
             if bl:
                 session.add_business_line(bl)
             # Dates: use date_input values; if empty, None (resolved at generation time)
-            sd = date.fromisoformat(str(start_input.value)) if start_input.value else None
-            ed = date.fromisoformat(str(end_input.value)) if end_input.value else None
+            sd = parse_date_flexible(start_input.value) if start_input.value else None
+            ed = parse_date_flexible(end_input.value) if end_input.value else None
             selected_jobs = jobs_input.value or []
             if isinstance(selected_jobs, str):
                 selected_jobs = [selected_jobs]

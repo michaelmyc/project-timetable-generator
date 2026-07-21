@@ -19,6 +19,7 @@ from datetime import date
 from pathlib import Path
 
 from timetable_generator.io.csv_reader import read_csv_rows
+from timetable_generator.io.date_utils import parse_date_flexible
 from timetable_generator.models.project import Project
 
 REQUIRED_COLUMNS = [
@@ -43,7 +44,7 @@ def _parse_date_cell(value: str | None) -> date | None:
     raw = _clean(value)
     if not raw:
         return None
-    return date.fromisoformat(raw)
+    return parse_date_flexible(raw)
 
 
 def _read_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
